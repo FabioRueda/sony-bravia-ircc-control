@@ -1,3 +1,11 @@
+# Build artifacts
+bin/
+obj/
+out/
+out-*/
+*.user
+
+# OS / misc
 *.log
 .DS_Store
 Thumbs.db

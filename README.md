@@ -77,6 +77,31 @@ guest Wi-Fi from the equipment network.**
 > codes are the standard BRAVIA ones; if one doesn't react on your model, the
 > official codes are in the TV's own `dmr.xml` (see below).
 
+## Windows GUI app (SonyTvRemote)
+
+A small clickable remote window is included under [`app/`](app/): power, volume,
+D-pad, inputs, channels, and "open a URL on the TV". It is built with
+[Avalonia](https://avaloniaui.net/), so it **cross-compiles to Windows from
+any OS** (Linux included) — unlike WinForms/WPF, it does not need the
+WindowsDesktop SDK.
+
+The compiled `.exe` is not committed (binaries don't belong in git). Build it
+yourself:
+
+```bash
+cd app
+dotnet publish -c Release -r win-x64 --self-contained true \
+  -p:PublishSingleFile=true \
+  -p:EnableCompressionInSingleFile=true \
+  -p:IncludeNativeLibrariesForSelfExtract=true \
+  -o out
+# -> out/SonyTvRemote.exe  (self-contained, ~42 MB, no .NET install needed)
+```
+
+Requires the .NET 8 SDK. The resulting `.exe` is self-contained: it runs on
+any Windows x64 machine with nothing else installed. It is unsigned, so
+Windows SmartScreen will warn on first run (More info → Run anyway).
+
 ## Controlling from any language (not just PowerShell)
 
 ### IRCC-IP (remote control) — `POST http://<IP>/sony/IRCC`
