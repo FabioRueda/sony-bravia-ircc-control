@@ -70,7 +70,7 @@ guest Wi-Fi from the equipment network.**
 - **Navigation:** `Up`, `Down`, `Left`, `Right`, `Ok`, `Back`, `Home`,
   `Options`, `Display`
 - **Channels:** `ChannelUp`, `ChannelDown`
-- **State:** `TvStatus`, `TvInfo`
+- **State:** `TvStatus` (power status), `TvInfo` (model info)
 - **Web:** `OpenPage "<url>"`
 
 > Power on/off and volume were confirmed on the KDL-42W805A. The navigation
@@ -142,6 +142,29 @@ endpoints:
 
 - IRCC: `http://<IP>/sony/IRCC`
 - App list (DIAL): `http://<IP>/DIAL/sony/applist`
+
+## Auth-free vs. auth-required Scalar methods (KDL-42W805A)
+
+- **Work without auth:** `system/getPowerStatus`, `system/getInterfaceInformation`,
+  `audio/getVolumeInformation`, `avContent/getCurrentExternalInputsStatus`,
+  `avContent/getSourceList`.
+- **Require auth** (the TV answers with `auth_url` instead of a result):
+  `avContent/getPlayingContentInfo`, `avContent/getContentList`,
+  `system/getSystemInformation`, `appControl/getApplicationList`.
+
+Inputs returned by `getCurrentExternalInputsStatus`:
+
+| Input | URI |
+|-------|-----|
+| HDMI 1 | `extInput:hdmi?port=1` |
+| HDMI 2 (MHL) | `extInput:hdmi?port=2` |
+| HDMI 3 | `extInput:hdmi?port=3` |
+| HDMI 4 | `extInput:hdmi?port=4` |
+| Video 1 | `extInput:composite?port=1` |
+| Video 2/Component | `extInput:composite?port=2` |
+| Screen mirroring | `extInput:widi?port=1` |
+
+> IRCC-IP (the remote-control buttons) needs no auth.
 
 ## Port scan (reference, KDL-42W805A)
 

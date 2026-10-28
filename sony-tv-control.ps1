@@ -81,11 +81,13 @@ function HDMI4 { Send-IRCC "AAAAAgAAABoAAABdAw==" }
 #  FINE CONTROL (Scalar API) - read and write state with exact values
 # =====================================================================
 
-# Show what is on screen now (input/app)
-function TvStatus { Send-Scalar "avContent" '{"method":"getPlayingContentInfo","id":1,"version":"1.0","params":[]}' }
+# Show whether the TV is on or in standby (getPowerStatus needs no auth;
+# getPlayingContentInfo requires auth on this TV)
+function TvStatus { Send-Scalar "system" '{"method":"getPowerStatus","id":1,"version":"1.0","params":[]}' }
 
-# Show the TV's system info
-function TvInfo   { Send-Scalar "system" '{"method":"getSystemInformation","id":1,"version":"1.0","params":[]}' }
+# Show model name and interface version (getInterfaceInformation needs no auth;
+# getSystemInformation requires auth on this TV)
+function TvInfo   { Send-Scalar "system" '{"method":"getInterfaceInformation","id":1,"version":"1.0","params":[]}' }
 
 # Read the current volume
 function VolGet   { Send-Scalar "audio" '{"method":"getVolumeInformation","id":1,"version":"1.0","params":[]}' }
