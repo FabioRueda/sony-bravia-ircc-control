@@ -10,7 +10,9 @@
  network.
 
  Usage:  . .\sony-tv-control.ps1     (loads the functions into the session)
-         PowerOn ; PowerOff ; VolSet 10 ; SwitchInput ; TvStatus ; OpenPage "https://example.com"
+         PowerOff ; VolUp ; SwitchInput ; HDMI1 ; TvStatus
+         (VolSet and OpenPage need pairing, which this script doesn't do;
+          PowerOn is ignored in standby on the KDL-42W805A - use Wake-on-LAN)
 =====================================================================
 #>
 
@@ -46,10 +48,12 @@ function Send-Scalar($service,$json){
 
 # =====================================================================
 #  NAMED COMMANDS (IRCC)
-#  Power on/off and volume confirmed on the KDL-42W805A. The rest are the
-#  standard BRAVIA codes; if one doesn't react, check the TV's dmr.xml at
+#  Power off and volume confirmed on the KDL-42W805A. Your TV's official
+#  codes: system/getRemoteControllerInfo (no auth), or the TV's dmr.xml at
 #  http://<IP>:52323/dmr.xml
 # =====================================================================
+# Power ON: the KDL-42W805A ignores it in standby (HTTP 200, TV stays off).
+# Only Wake-on-LAN turns that model on; see README.
 function PowerOn     { Send-IRCC "AAAAAQAAAAEAAAAuAw==" }   # Power ON
 function PowerOff    { Send-IRCC "AAAAAQAAAAEAAAAvAw==" }   # Power OFF
 function PowerToggle { Send-IRCC "AAAAAQAAAAEAAAAVAw==" }   # toggle on/off
@@ -66,10 +70,12 @@ function Down     { Send-IRCC "AAAAAQAAAAEAAAB1Aw==" }
 function Left     { Send-IRCC "AAAAAQAAAAEAAAA0Aw==" }
 function Right    { Send-IRCC "AAAAAQAAAAEAAAAzAw==" }
 function Ok       { Send-IRCC "AAAAAQAAAAEAAABlAw==" }
-function Back     { Send-IRCC "AAAAAQAAAAEAAABjAw==" }
+# Back, Options and Display use the official codes from the TV's own list
+# (system/getRemoteControllerInfo, checked 2026-10-28)
+function Back     { Send-IRCC "AAAAAgAAAJcAAAAjAw==" }   # "Return" (the old ...ABjAw== is "Exit")
 function Home     { Send-IRCC "AAAAAQAAAAEAAABgAw==" }
-function Options  { Send-IRCC "AAAAAQAAAAEAAAA2Aw==" }
-function Display  { Send-IRCC "AAAAAQAAAAEAAABKAw==" }
+function Options  { Send-IRCC "AAAAAgAAAJcAAAA2Aw==" }   # the old ...AA2Aw== toggled the sleep timer
+function Display  { Send-IRCC "AAAAAQAAAAEAAAA6Aw==" }
 
 # Direct HDMI inputs
 function HDMI1 { Send-IRCC "AAAAAgAAABoAAABaAw==" }
@@ -93,13 +99,17 @@ function TvInfo   { Send-Scalar "system" '{"method":"getInterfaceInformation","i
 function VolGet   { Send-Scalar "audio" '{"method":"getVolumeInformation","id":1,"version":"1.0","params":[]}' }
 
 # Lock the volume at an exact value:  VolSet 10
+# NOTE: setAudioVolume requires pairing on the KDL-42W805A (HTTP 403 with "auth_url").
+# Unpaired, use VolUp/VolDown (IRCC) instead.
 function VolSet($n){ Send-Scalar "audio" "{`"method`":`"setAudioVolume`",`"id`":1,`"version`":`"1.0`",`"params`":[{`"target`":`"speaker`",`"volume`":`"$n`"}]}" }
 
 # List the TV's available inputs
 function ListInputs { Send-Scalar "avContent" '{"method":"getCurrentExternalInputsStatus","id":1,"version":"1.0","params":[]}' }
 
-# Open a web page on the TV's browser
+# Open a web page on the TV's browser.
+# NOTE: requires pairing. Unpaired, the TV answers HTTP 403 with "auth_url".
+# This script does not pair; use the SonyTvRemote app ("Pair with TV").
 function OpenPage($url){ Send-Scalar "appControl" "{`"method`":`"setActiveApp`",`"id`":1,`"version`":`"1.0`",`"params`":[{`"uri`":`"localapp://webappruntime?url=$url`"}]}" }
 
 Write-Host "TV functions loaded. Target IP: $($global:TV_IP)" -ForegroundColor Green
-Write-Host "Examples: PowerOn | PowerOff | VolSet 10 | SwitchInput | TvStatus | OpenPage 'https://example.com'" -ForegroundColor Green
+Write-Host "Examples: PowerOff | VolUp | SwitchInput | HDMI1 | TvStatus" -ForegroundColor Green

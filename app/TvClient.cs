@@ -1,0 +1,180 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+// HTTP calls to the TV: IRCC-IP (SOAP) and the Scalar Web API (JSON-RPC), plus
+// PIN pairing. The pairing cookie is sent on every Scalar call when present.
+
+namespace SonyTvRemote
+{
+    public class TvReply
+    {
+        public int Status;       // 0 = no response (or invalid address)
+        public string Body;
+        public string SetCookie;
+
+        public bool Ok => Status == 200 && ScalarReply.ErrorCode(Body) == null;
+    }
+
+    public class TvClient
+    {
+        public static readonly TimeSpan NormalTimeout = TimeSpan.FromSeconds(5);
+        // For status polls and first-contact info, so an unreachable TV doesn't stall the UI.
+        public static readonly TimeSpan QuickTimeout = TimeSpan.FromSeconds(1.5);
+
+        private readonly HttpClient _http;
+        private readonly Settings _settings;
+        private readonly string _settingsPath;
+
+        public string Ip { get; set; }
+
+        public TvClient(Settings settings, string settingsPath, HttpMessageHandler handler = null)
+        {
+            _settings = settings;
+            _settingsPath = settingsPath;
+            // Per-request timeouts come from a CancellationToken in Send.
+            _http = new HttpClient(handler ?? new HttpClientHandler { UseCookies = false })
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            };
+        }
+
+        public bool IsPaired => _settings.GetCookie() != null
+                             && _settings.AuthExpiresUtc != null && _settings.AuthExpiresUtc > DateTime.UtcNow;
+
+        public DateTime? PairedUntilUtc => _settings.AuthExpiresUtc;
+
+        public Task<TvReply> Ircc(string code)
+        {
+            var soap =
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+                "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">" +
+                "<s:Body><u:X_SendIRCC xmlns:u=\"urn:schemas-sony-com:service:IRCC:1\">" +
+                "<IRCCCode>" + code + "</IRCCCode></u:X_SendIRCC></s:Body></s:Envelope>";
+
+            return Send("IRCC", NormalTimeout, req =>
+            {
+                req.Content = new StringContent(soap, Encoding.UTF8, "text/xml");
+                req.Headers.TryAddWithoutValidation("SOAPAction", "\"urn:schemas-sony-com:service:IRCC:1#X_SendIRCC\"");
+            });
+        }
+
+        public Task<TvReply> Scalar(string service, string method, params object[] parameters)
+            => ScalarWithin(NormalTimeout, service, method, parameters);
+
+        public Task<TvReply> QuickScalar(string service, string method, params object[] parameters)
+            => ScalarWithin(QuickTimeout, service, method, parameters);
+
+        private Task<TvReply> ScalarWithin(TimeSpan timeout, string service, string method, object[] parameters)
+        {
+            var json = Json(method, parameters);
+            var cookie = _settings.GetCookie();
+            return Send(service, timeout, req =>
+            {
+                req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                if (cookie != null) req.Headers.TryAddWithoutValidation("Cookie", cookie);
+            });
+        }
+
+        // accessControl/actRegister. No PIN and no cookie: the TV shows a PIN and answers 401.
+        // With the PIN: Basic auth with an empty user. With the cookie: renews without a PIN.
+        public Task<TvReply> ActRegister(string pin, bool withCookie)
+        {
+            var clientId = _settings.EnsureClientId();
+            var json = Json("actRegister", new object[]
+            {
+                new Dictionary<string, string>
+                {
+                    ["clientid"] = "SonyTvRemote:" + clientId,
+                    ["nickname"] = "SonyTvRemote (" + Environment.MachineName + ")",
+                    ["level"] = "private"
+                },
+                new object[] { new Dictionary<string, string> { ["value"] = "yes", ["function"] = "WOL" } }
+            });
+            var cookie = withCookie ? _settings.GetCookie() : null;
+            return Send("accessControl", NormalTimeout, req =>
+            {
+                req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                if (pin != null)
+                    req.Headers.Authorization = new AuthenticationHeaderValue("Basic",
+                        Convert.ToBase64String(Encoding.ASCII.GetBytes(":" + pin)));
+                if (cookie != null) req.Headers.TryAddWithoutValidation("Cookie", cookie);
+            });
+        }
+
+        // Keeps the cookie from a successful actRegister. Returns false if there is none.
+        // A failed save to disk still leaves the cookie usable for this session.
+        public bool SaveCookie(TvReply reply)
+        {
+            if (reply.Status != 200) return false;
+            if (!AuthCookie.TryParse(reply.SetCookie, DateTime.UtcNow, out var cookie, out var expires)) return false;
+            _settings.SetCookie(cookie, expires);
+            TrySave();
+            return true;
+        }
+
+        // Renews the cookie without a PIN when less than 2 days remain. An expired cookie is
+        // dropped without asking the TV (it would show a PIN nobody asked for).
+        public async Task RenewIfNeeded()
+        {
+            var exp = _settings.AuthExpiresUtc;
+            if (_settings.GetCookie() == null || exp == null) return;
+            if (exp.Value <= DateTime.UtcNow)
+            {
+                _settings.ClearCookie();
+                TrySave();
+                return;
+            }
+            if (!AuthCookie.NeedsRenewal(exp.Value, DateTime.UtcNow)) return;
+
+            SaveCookie(await ActRegister(null, true));
+        }
+
+        private void TrySave()
+        {
+            try { _settings.Save(_settingsPath); } catch (Exception) { }
+        }
+
+        private static string Json(string method, object[] parameters)
+            => JsonSerializer.Serialize(new Dictionary<string, object>
+            {
+                ["method"] = method,
+                ["id"] = 1,
+                ["version"] = "1.0",
+                ["params"] = parameters
+            });
+
+        private async Task<TvReply> Send(string path, TimeSpan timeout, Action<HttpRequestMessage> fill)
+        {
+            if (!UrlHelper.IsValidHost(Ip)) return new TvReply { Status = 0 };
+            try
+            {
+                using (var req = new HttpRequestMessage(HttpMethod.Post, "http://" + Ip + "/sony/" + path))
+                using (var cts = new CancellationTokenSource(timeout))
+                {
+                    fill(req);
+                    using (var resp = await _http.SendAsync(req, cts.Token))
+                    {
+                        var reply = new TvReply
+                        {
+                            Status = (int)resp.StatusCode,
+                            Body = await resp.Content.ReadAsStringAsync()
+                        };
+                        if (resp.Headers.TryGetValues("Set-Cookie", out var cookies))
+                            reply.SetCookie = string.Join("; ", cookies);
+                        return reply;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                return new TvReply { Status = 0 };
+            }
+        }
+    }
+}
