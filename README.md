@@ -84,6 +84,17 @@ OS** (Linux included).
   are saved in `%APPDATA%\SonyTvRemote\settings.json`. Without that file the
   IP defaults to `192.168.1.100`. The pairing cookie is encrypted with Windows
   DPAPI (current user only).
+- **One entry per TV:** the Wake-on-LAN MAC and the pairing are stored per TV,
+  keyed by its IP. Switching the IP switches to that TV's own data: Power On
+  uses the MAC saved for that IP, and the cookie saved for that IP is the only
+  one sent to it. A settings file from 1.1.0 is migrated automatically to the
+  saved IP.
+
+> **Reserve the TV's IP in your router** (DHCP reservation / static lease). The
+> app knows a TV only by its IP. If the TV gets a new IP, the app treats it as a
+> different TV: it has to learn the MAC again (with the TV on, or in a standby
+> that still answers on port 80) and you have to pair again. And if another
+> device later gets the TV's old IP, the app would use the old TV's data for it.
 
 The version number lives only in `<Version>` in
 [`app/TvRemote.csproj`](app/TvRemote.csproj); the window title and About
@@ -181,8 +192,10 @@ In standby the KDL-42W805A still answers on port 80 (`getPowerStatus` returns
 `{"error":[15,"power on not supported"]}`. **Only Wake-on-LAN turns it on.**
 
 The TV reports its MAC without pairing in `system/getSystemSupportedFunction`
-(item with `"option":"WOL"`). The app saves it the first time it talks to the
-TV, so it is available when the TV is in standby.
+(item with `"option":"WOL"`). The app saves it for that TV's IP the first time
+it talks to the TV, so it is available when the TV is in standby. If no MAC is
+saved for the current IP, Power On asks the TV for it first (the KDL-42W805A
+still answers on port 80 in standby).
 
 The app's **Power On**:
 

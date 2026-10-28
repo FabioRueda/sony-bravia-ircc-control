@@ -63,7 +63,7 @@ namespace SonyTvRemote
             ["PowerWaking"] = "Turning the TV on…",
             ["PowerOnOk"] = "On",
             ["PowerStillStandby"] = "Still in standby",
-            ["PowerNoMac"] = "Still in standby. No MAC saved for Wake-on-LAN yet: use any button once with the TV on.",
+            ["PowerNoMac"] = "Still in standby. No Wake-on-LAN MAC saved for this IP yet: use any button once with the TV on.",
 
             ["AboutTitle"] = "About",
             ["Version"] = "Version {0}",
@@ -71,7 +71,17 @@ namespace SonyTvRemote
             ["History"] = "Version history",
             ["Close"] = "Close",
             ["ChangelogText"] =
-@"1.1.0 — 2026-10-28
+@"1.1.1 — 2026-10-28
+
+Fixed
+• Wake-on-LAN MAC and pairing are now stored per TV (by IP); switching the IP no longer wakes or sends the cookie to the previous TV.
+
+Changed
+• settings.json keeps the MAC and pairing under Tvs, one entry per IP. A 1.1.0 file is migrated automatically to the saved IP, keeping the current pairing.
+• Power On with no MAC saved for the current IP asks that TV for it (system/getSystemSupportedFunction) before giving up.
+• An unreadable settings.json is copied to settings.json.bad before the app falls back to defaults.
+
+1.1.0 — 2026-10-28
 
 Added
 • Version number in the window title and an About window with the version history.
@@ -151,7 +161,7 @@ Added
             ["PowerWaking"] = "Ligando a TV…",
             ["PowerOnOk"] = "Ligada",
             ["PowerStillStandby"] = "Ainda em standby",
-            ["PowerNoMac"] = "Ainda em standby. Ainda não há MAC salvo para o Wake-on-LAN: use qualquer botão uma vez com a TV ligada.",
+            ["PowerNoMac"] = "Ainda em standby. Ainda não há MAC do Wake-on-LAN salvo para este IP: use qualquer botão uma vez com a TV ligada.",
 
             ["AboutTitle"] = "Sobre",
             ["Version"] = "Versão {0}",
@@ -159,7 +169,17 @@ Added
             ["History"] = "Histórico de versões",
             ["Close"] = "Fechar",
             ["ChangelogText"] =
-@"1.1.0 — 28/10/2026
+@"1.1.1 — 28/10/2026
+
+Corrigido
+• O MAC do Wake-on-LAN e o pareamento agora ficam guardados por TV (pelo IP); trocar o IP não liga mais a TV anterior nem manda o cookie para ela.
+
+Mudou
+• O settings.json guarda o MAC e o pareamento em Tvs, uma entrada por IP. Um arquivo da 1.1.0 é migrado sozinho para o IP salvo, sem perder o pareamento.
+• Ligar sem MAC salvo para o IP atual pergunta o MAC a essa TV (system/getSystemSupportedFunction) antes de desistir.
+• Um settings.json ilegível é copiado para settings.json.bad antes de o app voltar ao padrão.
+
+1.1.0 — 28/10/2026
 
 Novo
 • Número da versão no título da janela e janela Sobre com o histórico de versões.

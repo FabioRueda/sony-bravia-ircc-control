@@ -18,6 +18,7 @@ namespace SonyTvRemote.Tests
     {
         public readonly List<(HttpRequestMessage Req, string Body)> Requests = new List<(HttpRequestMessage, string)>();
         public readonly Queue<Func<HttpResponseMessage>> Replies = new Queue<Func<HttpResponseMessage>>();
+        public Action OnSend;   // runs while the request is "in flight"
 
         public void Reply(HttpStatusCode code, string body, string setCookie = null)
             => Replies.Enqueue(() =>
@@ -31,6 +32,7 @@ namespace SonyTvRemote.Tests
         {
             var body = request.Content == null ? null : await request.Content.ReadAsStringAsync();
             Requests.Add((request, body));
+            OnSend?.Invoke();
             if (Replies.Count == 0) throw new HttpRequestException("no reply queued");
             return Replies.Dequeue()();
         }
@@ -40,6 +42,8 @@ namespace SonyTvRemote.Tests
     {
         private readonly string _dir = Path.Combine(Path.GetTempPath(), "SonyTvRemoteTests-" + Guid.NewGuid());
         private string FilePath => Path.Combine(_dir, "settings.json");
+        private const string Ip = "192.168.1.100";
+        private const string OtherIp = "192.168.1.101";
         private readonly StubHandler _stub = new StubHandler();
         private readonly Settings _settings;
         private readonly TvClient _tv;
@@ -47,7 +51,7 @@ namespace SonyTvRemote.Tests
         public TvClientTests()
         {
             _settings = Settings.Load(FilePath);
-            _tv = new TvClient(_settings, FilePath, _stub) { Ip = "192.168.1.100" };
+            _tv = new TvClient(_settings, FilePath, _stub) { Ip = Ip };
         }
 
         public void Dispose()
@@ -93,14 +97,14 @@ namespace SonyTvRemote.Tests
             Assert.Equal("Basic", req.Headers.Authorization.Scheme);
             Assert.Equal(Convert.ToBase64String(Encoding.ASCII.GetBytes(":1234")), req.Headers.Authorization.Parameter);
             Assert.True(_tv.SaveCookie(r));
-            Assert.Equal("auth=abc", _settings.GetCookie());
+            Assert.Equal("auth=abc", _settings.GetCookie(Ip));
             Assert.True(_tv.IsPaired);
         }
 
         [Fact]
         public async Task Scalar_sends_the_cookie_when_paired()
         {
-            _settings.SetCookie("auth=abc", DateTime.UtcNow.AddDays(10));
+            _settings.SetCookie(Ip, "auth=abc", DateTime.UtcNow.AddDays(10));
             _stub.Reply(HttpStatusCode.OK, "{\"id\":1,\"result\":[]}");
             await _tv.Scalar("appControl", "setActiveApp", new Dictionary<string, string> { ["uri"] = "x" });
 
@@ -121,7 +125,7 @@ namespace SonyTvRemote.Tests
         [Fact]
         public async Task Renew_is_skipped_while_more_than_two_days_remain()
         {
-            _settings.SetCookie("auth=abc", DateTime.UtcNow.AddDays(5));
+            _settings.SetCookie(Ip, "auth=abc", DateTime.UtcNow.AddDays(5));
             await _tv.RenewIfNeeded();
             Assert.Empty(_stub.Requests);
         }
@@ -129,37 +133,142 @@ namespace SonyTvRemote.Tests
         [Fact]
         public async Task Renew_sends_the_cookie_without_pin_and_saves_the_new_one()
         {
-            _settings.SetCookie("auth=old", DateTime.UtcNow.AddDays(1));
+            _settings.SetCookie(Ip, "auth=old", DateTime.UtcNow.AddDays(1));
             _stub.Reply(HttpStatusCode.OK, "{\"id\":1,\"result\":[]}", "auth=new; path=/sony/; max-age=1209600");
             await _tv.RenewIfNeeded();
 
             var req = _stub.Requests.Single().Req;
             Assert.Equal("auth=old", Header(req, "Cookie"));
             Assert.Null(req.Headers.Authorization);
-            Assert.Equal("auth=new", _settings.GetCookie());
-            Assert.True(_settings.AuthExpiresUtc > DateTime.UtcNow.AddDays(13));
+            Assert.Equal("auth=new", _settings.GetCookie(Ip));
+            Assert.True(_settings.GetAuthExpiresUtc(Ip) > DateTime.UtcNow.AddDays(13));
             if (OperatingSystem.IsWindows())   // persisted only with DPAPI
-                Assert.Equal("auth=new", Settings.Load(FilePath).GetCookie());
+                Assert.Equal("auth=new", Settings.Load(FilePath).GetCookie(Ip));
         }
 
         [Fact]
         public async Task Failed_renewal_before_expiry_keeps_the_cookie()
         {
-            _settings.SetCookie("auth=old", DateTime.UtcNow.AddDays(1));
+            _settings.SetCookie(Ip, "auth=old", DateTime.UtcNow.AddDays(1));
             _stub.Reply(HttpStatusCode.Unauthorized, "");
             await _tv.RenewIfNeeded();
-            Assert.Equal("auth=old", _settings.GetCookie());
+            Assert.Equal("auth=old", _settings.GetCookie(Ip));
             Assert.True(_tv.IsPaired);
         }
 
         [Fact]
         public async Task Expired_cookie_is_dropped_without_asking_the_tv()
         {
-            _settings.SetCookie("auth=old", DateTime.UtcNow.AddMinutes(-1));
+            _settings.SetCookie(Ip, "auth=old", DateTime.UtcNow.AddMinutes(-1));
             await _tv.RenewIfNeeded();
             Assert.Empty(_stub.Requests);
-            Assert.Null(_settings.GetCookie());
+            Assert.Null(_settings.GetCookie(Ip));
             Assert.False(_tv.IsPaired);
+        }
+
+        // ---------- per-TV data (1.1.1) ----------
+
+        [Fact]
+        public async Task Switching_ip_does_not_send_the_other_tvs_cookie()
+        {
+            _settings.SetCookie(Ip, "auth=abc", DateTime.UtcNow.AddDays(10));
+            _tv.Ip = OtherIp;
+            Assert.False(_tv.IsPaired);
+            Assert.Null(_tv.PairedUntilUtc);
+
+            _stub.Reply(HttpStatusCode.OK, "{\"id\":1,\"result\":[]}");
+            await _tv.Scalar("system", "getPowerStatus");
+            Assert.Null(Header(_stub.Requests.Single().Req, "Cookie"));
+        }
+
+        [Fact]
+        public void Switching_ip_does_not_reuse_the_other_tvs_mac()
+        {
+            _settings.SetMac(Ip, "01:23:45:67:89:AA");
+            Assert.Equal("01:23:45:67:89:AA", _tv.Mac);
+            _tv.Ip = OtherIp;
+            Assert.Null(_tv.Mac);
+        }
+
+        [Fact]
+        public async Task Refresh_mac_asks_the_current_tv_and_stores_it_under_its_ip()
+        {
+            _settings.SetMac(Ip, "01:23:45:67:89:AA");
+            _tv.Ip = OtherIp;
+            _stub.Reply(HttpStatusCode.OK,
+                "{\"id\":1,\"result\":[[{\"option\":\"WOL\",\"value\":\"01:23:45:67:89:BB\"}]]}");
+
+            Assert.Equal("01:23:45:67:89:BB", await _tv.RefreshMac(TvClient.QuickTimeout));
+            var (req, body) = _stub.Requests.Single();
+            Assert.Equal("http://192.168.1.101/sony/system", req.RequestUri.ToString());
+            Assert.Contains("getSystemSupportedFunction", body);
+            Assert.Equal("01:23:45:67:89:BB", _settings.GetMac(OtherIp));
+            Assert.Equal("01:23:45:67:89:AA", _settings.GetMac(Ip));
+        }
+
+        [Fact]
+        public async Task Refresh_mac_without_answer_keeps_nothing()
+        {
+            _tv.Ip = OtherIp;
+            Assert.Null(await _tv.RefreshMac(TvClient.QuickTimeout));   // no reply queued
+            Assert.Null(_settings.GetMac(OtherIp));
+        }
+
+        [Fact]
+        public async Task Pairing_cookie_is_saved_for_the_current_ip_only()
+        {
+            _tv.Ip = OtherIp;
+            _stub.Reply(HttpStatusCode.OK, "{\"id\":1,\"result\":[]}", "auth=b; path=/sony/; max-age=1209600");
+            Assert.True(_tv.SaveCookie(await _tv.ActRegister("1234", false)));
+            Assert.Equal("auth=b", _settings.GetCookie(OtherIp));
+            Assert.Null(_settings.GetCookie(Ip));
+        }
+
+        [Fact]
+        public async Task Renewal_only_touches_the_current_ip()
+        {
+            _settings.SetCookie(Ip, "auth=a", DateTime.UtcNow.AddMinutes(-1));     // expired
+            _settings.SetCookie(OtherIp, "auth=b", DateTime.UtcNow.AddDays(10));
+            _tv.Ip = OtherIp;
+            await _tv.RenewIfNeeded();
+            Assert.Empty(_stub.Requests);
+            Assert.Equal("auth=a", _settings.GetCookie(Ip));   // not cleared: not the current TV
+            Assert.Equal("auth=b", _settings.GetCookie(OtherIp));
+        }
+
+        [Fact]
+        public async Task Mac_reply_is_stored_under_the_ip_it_came_from_even_if_the_ip_changes_meanwhile()
+        {
+            _stub.Reply(HttpStatusCode.OK,
+                "{\"id\":1,\"result\":[[{\"option\":\"WOL\",\"value\":\"01:23:45:67:89:AA\"}]]}");
+            _stub.OnSend = () => _tv.Ip = OtherIp;
+
+            Assert.Equal("01:23:45:67:89:AA", await _tv.RefreshMac(TvClient.QuickTimeout));
+            Assert.Equal("01:23:45:67:89:AA", _settings.GetMac(Ip));
+            Assert.Null(_settings.GetMac(OtherIp));
+        }
+
+        [Fact]
+        public async Task Cookie_reply_is_stored_under_the_ip_it_came_from_even_if_the_ip_changes_meanwhile()
+        {
+            _stub.Reply(HttpStatusCode.OK, "{\"id\":1,\"result\":[]}", "auth=a; path=/sony/; max-age=1209600");
+            _stub.OnSend = () => _tv.Ip = OtherIp;
+
+            Assert.True(_tv.SaveCookie(await _tv.ActRegister("1234", false)));
+            Assert.Equal("auth=a", _settings.GetCookie(Ip));
+            Assert.Null(_settings.GetCookie(OtherIp));
+        }
+
+        [Fact]
+        public async Task Renewal_reply_is_stored_under_the_ip_it_came_from()
+        {
+            _settings.SetCookie(Ip, "auth=old", DateTime.UtcNow.AddDays(1));
+            _stub.Reply(HttpStatusCode.OK, "{\"id\":1,\"result\":[]}", "auth=new; path=/sony/; max-age=1209600");
+            _stub.OnSend = () => _tv.Ip = OtherIp;
+
+            await _tv.RenewIfNeeded();
+            Assert.Equal("auth=new", _settings.GetCookie(Ip));
+            Assert.Null(_settings.GetCookie(OtherIp));
         }
     }
 }

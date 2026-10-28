@@ -15,6 +15,7 @@ namespace SonyTvRemote
     public class TvReply
     {
         public int Status;       // 0 = no response (or invalid address)
+        public string Ip;        // the TV the request went to (the current IP may change meanwhile)
         public string Body;
         public string SetCookie;
 
@@ -44,10 +45,28 @@ namespace SonyTvRemote
             };
         }
 
-        public bool IsPaired => _settings.GetCookie() != null
-                             && _settings.AuthExpiresUtc != null && _settings.AuthExpiresUtc > DateTime.UtcNow;
+        // MAC and pairing always refer to the TV at the current IP.
+        public bool IsPaired => _settings.GetCookie(Ip) != null
+                             && _settings.GetAuthExpiresUtc(Ip) is DateTime exp && exp > DateTime.UtcNow;
 
-        public DateTime? PairedUntilUtc => _settings.AuthExpiresUtc;
+        public DateTime? PairedUntilUtc => _settings.GetAuthExpiresUtc(Ip);
+
+        public string Mac => _settings.GetMac(Ip);
+
+        // Asks the TV for its Wake-on-LAN MAC (system/getSystemSupportedFunction, no pairing)
+        // and saves it for the current IP. Null when the TV doesn't answer or has none.
+        public async Task<string> RefreshMac(TimeSpan timeout)
+        {
+            var reply = await ScalarWithin(timeout, "system", "getSystemSupportedFunction", new object[0]);
+            var mac = ScalarReply.WolMac(reply.Body);
+            if (mac == null) return null;
+            if (mac != _settings.GetMac(reply.Ip))
+            {
+                _settings.SetMac(reply.Ip, mac);
+                TrySave();
+            }
+            return mac;
+        }
 
         public Task<TvReply> Ircc(string code)
         {
@@ -73,7 +92,7 @@ namespace SonyTvRemote
         private Task<TvReply> ScalarWithin(TimeSpan timeout, string service, string method, object[] parameters)
         {
             var json = Json(method, parameters);
-            var cookie = _settings.GetCookie();
+            var cookie = _settings.GetCookie(Ip);
             return Send(service, timeout, req =>
             {
                 req.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -96,7 +115,7 @@ namespace SonyTvRemote
                 },
                 new object[] { new Dictionary<string, string> { ["value"] = "yes", ["function"] = "WOL" } }
             });
-            var cookie = withCookie ? _settings.GetCookie() : null;
+            var cookie = withCookie ? _settings.GetCookie(Ip) : null;
             return Send("accessControl", NormalTimeout, req =>
             {
                 req.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -113,7 +132,7 @@ namespace SonyTvRemote
         {
             if (reply.Status != 200) return false;
             if (!AuthCookie.TryParse(reply.SetCookie, DateTime.UtcNow, out var cookie, out var expires)) return false;
-            _settings.SetCookie(cookie, expires);
+            _settings.SetCookie(reply.Ip, cookie, expires);
             TrySave();
             return true;
         }
@@ -122,11 +141,11 @@ namespace SonyTvRemote
         // dropped without asking the TV (it would show a PIN nobody asked for).
         public async Task RenewIfNeeded()
         {
-            var exp = _settings.AuthExpiresUtc;
-            if (_settings.GetCookie() == null || exp == null) return;
+            var exp = _settings.GetAuthExpiresUtc(Ip);
+            if (_settings.GetCookie(Ip) == null || exp == null) return;
             if (exp.Value <= DateTime.UtcNow)
             {
-                _settings.ClearCookie();
+                _settings.ClearCookie(Ip);
                 TrySave();
                 return;
             }
@@ -151,10 +170,12 @@ namespace SonyTvRemote
 
         private async Task<TvReply> Send(string path, TimeSpan timeout, Action<HttpRequestMessage> fill)
         {
-            if (!UrlHelper.IsValidHost(Ip)) return new TvReply { Status = 0 };
+            // Taken before any await: replies are stored under the TV that was asked.
+            var ip = Ip;
+            if (!UrlHelper.IsValidHost(ip)) return new TvReply { Status = 0, Ip = ip };
             try
             {
-                using (var req = new HttpRequestMessage(HttpMethod.Post, "http://" + Ip + "/sony/" + path))
+                using (var req = new HttpRequestMessage(HttpMethod.Post, "http://" + ip + "/sony/" + path))
                 using (var cts = new CancellationTokenSource(timeout))
                 {
                     fill(req);
@@ -163,6 +184,7 @@ namespace SonyTvRemote
                         var reply = new TvReply
                         {
                             Status = (int)resp.StatusCode,
+                            Ip = ip,
                             Body = await resp.Content.ReadAsStringAsync()
                         };
                         if (resp.Headers.TryGetValues("Set-Cookie", out var cookies))
@@ -173,7 +195,7 @@ namespace SonyTvRemote
             }
             catch (Exception)
             {
-                return new TvReply { Status = 0 };
+                return new TvReply { Status = 0, Ip = ip };
             }
         }
     }

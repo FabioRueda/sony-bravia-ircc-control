@@ -260,7 +260,8 @@ namespace SonyTvRemote
                 _codes = null;
                 _infoFailedUtc = DateTime.MinValue;
             }
-            bool needCodes = _codes == null, needMac = _settings.Mac == null;
+            // The MAC is per TV: a TV at a new IP needs its own, even if another IP has one.
+            bool needCodes = _codes == null, needMac = _tv.Mac == null;
             if (!needCodes && !needMac) return;
             if (DateTime.UtcNow - _infoFailedUtc < InfoRetry) return;
 
@@ -271,19 +272,7 @@ namespace SonyTvRemote
                 if (_codes == null) _infoFailedUtc = DateTime.UtcNow;
                 if (r.Status == 0) return;
             }
-            if (needMac && !await SaveMac()) _infoFailedUtc = DateTime.UtcNow;
-        }
-
-        private async Task<bool> SaveMac()
-        {
-            var mac = ScalarReply.WolMac((await _tv.QuickScalar("system", "getSystemSupportedFunction")).Body);
-            if (mac == null) return false;
-            if (mac != _settings.Mac)
-            {
-                _settings.Mac = mac;
-                SaveSettings();
-            }
-            return true;
+            if (needMac && await _tv.RefreshMac(TvClient.QuickTimeout) == null) _infoFailedUtc = DateTime.UtcNow;
         }
 
         private async Task SendNamed(string irccName)
@@ -310,6 +299,7 @@ namespace SonyTvRemote
             try
             {
                 SetStatus("PairAsking", false);
+                var pairedIp = _tv.Ip;
 
                 var first = await _tv.ActRegister(null, false);
                 if (first.Status == 0) { SetStatus("NoResponse", true); return; }
@@ -320,15 +310,18 @@ namespace SonyTvRemote
                     if (first.Status != 401) { SetStatus("PairFailed", true, first.Status); return; }
 
                     var pin = await new PinWindow().ShowDialog<string>(this);
-                    if (pin == null) { SetStatus("PairCancelled", true); return; }
+                    // The PIN belongs to the TV that showed it; don't send it to another IP.
+                    if (pin == null || _tv.Ip != pairedIp) { SetStatus("PairCancelled", true); return; }
 
                     var second = await _tv.ActRegister(pin, false);
                     if (second.Status == 0) { SetStatus("NoResponse", true); return; }
                     if (!_tv.SaveCookie(second)) { SetStatus("PairFailed", true, second.Status); return; }
                 }
 
-                await SaveMac();
-                SetStatus("Paired", false, _tv.PairedUntilUtc.Value.ToLocalTime());
+                // The IP may have been changed while the PIN dialog was open: report the TV that paired.
+                await _tv.RefreshMac(TvClient.QuickTimeout);
+                var until = _settings.GetAuthExpiresUtc(pairedIp);
+                if (until != null) SetStatus("Paired", false, until.Value.ToLocalTime());
             }
             finally
             {
@@ -345,13 +338,9 @@ namespace SonyTvRemote
             {
                 SetStatus("PowerWaking", false);
 
-                // Wake-on-LAN goes out first with the saved MAC; only without one do we ask the TV.
-                var mac = _settings.Mac;
-                if (mac == null)
-                {
-                    await LoadTvInfo();
-                    mac = _settings.Mac;
-                }
+                // Wake-on-LAN goes out first with the MAC saved for this IP. Without one, ask this
+                // TV directly (no retry back-off; the KDL-42W805A still answers on port 80 in standby).
+                var mac = _tv.Mac ?? await _tv.RefreshMac(TvClient.NormalTimeout);
 
                 var clock = Stopwatch.StartNew();
                 bool on = await PowerOnSequence.RunAsync(

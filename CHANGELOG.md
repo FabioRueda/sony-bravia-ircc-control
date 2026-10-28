@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-10-28
+
+### Fixed
+- Wake-on-LAN MAC and pairing are now stored per TV (by IP); switching the IP no longer wakes or sends the cookie to the previous TV.
+
+### Changed
+- `settings.json` keeps the MAC and pairing under `Tvs`, one entry per IP. A 1.1.0 file is migrated automatically to the saved IP, keeping the current pairing.
+- Power On with no MAC saved for the current IP asks that TV for it (`system/getSystemSupportedFunction`) before giving up.
+- An unreadable `settings.json` is copied to `settings.json.bad` before the app falls back to defaults.
+
 ## [1.1.0] - 2026-10-28
 
 ### Added
@@ -31,5 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial version, never published as a release: Windows GUI remote (Avalonia) with power, volume, D-pad, inputs, channels and "open a URL on the TV", plus the PowerShell script.
 
-[1.1.0]: https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.1.0
+[1.1.1]: https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.1.1
+[1.1.0]: https://github.com/FabioRueda/sony-bravia-ircc-control/commit/d43f6f0
 [1.0.0]: https://github.com/FabioRueda/sony-bravia-ircc-control/commit/047a63b
