@@ -1,0 +1,103 @@
+<#
+=====================================================================
+ Network control for Sony BRAVIA TVs (2010-2013 generation)
+ IRCC-IP (remote control) + Scalar Web API (fine-grained state)
+ No app, no sideload, no root.
+
+ SECURITY WARNING: on this generation IRCC-IP usually accepts commands
+ with no password. Any machine on the same network can control the TV.
+ In a commercial environment, separate guest Wi-Fi from the equipment
+ network.
+
+ Usage:  . .\sony-tv-control.ps1     (loads the functions into the session)
+         PowerOn ; PowerOff ; VolSet 10 ; SwitchInput ; TvStatus ; OpenPage "https://example.com"
+=====================================================================
+#>
+
+$global:TV_IP = "192.168.1.100"   # <-- SET this to your TV's IP (Menu > Network > View network status)
+
+# ---------- ENGINE: send a remote control code (IRCC) ----------
+function Send-IRCC($code){
+  $b = @"
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<s:Body><u:X_SendIRCC xmlns:u="urn:schemas-sony-com:service:IRCC:1"><IRCCCode>$code</IRCCCode></u:X_SendIRCC></s:Body></s:Envelope>
+"@
+  try {
+    Invoke-WebRequest -Uri "http://$($global:TV_IP)/sony/IRCC" -Method POST -Body $b -Headers @{
+      "SOAPAction"='"urn:schemas-sony-com:service:IRCC:1#X_SendIRCC"'
+      "Content-Type"="text/xml; charset=UTF-8"
+    } -UseBasicParsing -TimeoutSec 5 | Out-Null
+    return $true
+  } catch {
+    Write-Host "Failed (TV off or off-network?): $($_.Exception.Message)" -ForegroundColor Yellow
+    return $false
+  }
+}
+
+# ---------- ENGINE: call the Scalar Web API (state and fine control) ----------
+function Send-Scalar($service,$json){
+  try {
+    Invoke-RestMethod -Uri "http://$($global:TV_IP)/sony/$service" -Method POST -Body $json -ContentType "application/json" -TimeoutSec 5
+  } catch {
+    Write-Host "Scalar API failed: $($_.Exception.Message)" -ForegroundColor Yellow
+  }
+}
+
+# =====================================================================
+#  NAMED COMMANDS (IRCC)
+#  Power on/off and volume confirmed on the KDL-42W805A. The rest are the
+#  standard BRAVIA codes; if one doesn't react, check the TV's dmr.xml at
+#  http://<IP>:52323/dmr.xml
+# =====================================================================
+function PowerOn     { Send-IRCC "AAAAAQAAAAEAAAAuAw==" }   # Power ON
+function PowerOff    { Send-IRCC "AAAAAQAAAAEAAAAvAw==" }   # Power OFF
+function PowerToggle { Send-IRCC "AAAAAQAAAAEAAAAVAw==" }   # toggle on/off
+function VolUp       { Send-IRCC "AAAAAQAAAAEAAAASAw==" }
+function VolDown     { Send-IRCC "AAAAAQAAAAEAAAATAw==" }
+function Mute        { Send-IRCC "AAAAAQAAAAEAAAAUAw==" }
+function SwitchInput { Send-IRCC "AAAAAQAAAAEAAAAlAw==" }   # cycles inputs
+function ChannelUp   { Send-IRCC "AAAAAQAAAAEAAAAQAw==" }
+function ChannelDown { Send-IRCC "AAAAAQAAAAEAAAARAw==" }
+
+# Navigation (arrows, OK, back, menu)
+function Up       { Send-IRCC "AAAAAQAAAAEAAAB0Aw==" }
+function Down     { Send-IRCC "AAAAAQAAAAEAAAB1Aw==" }
+function Left     { Send-IRCC "AAAAAQAAAAEAAAA0Aw==" }
+function Right    { Send-IRCC "AAAAAQAAAAEAAAAzAw==" }
+function Ok       { Send-IRCC "AAAAAQAAAAEAAABlAw==" }
+function Back     { Send-IRCC "AAAAAQAAAAEAAABjAw==" }
+function Home     { Send-IRCC "AAAAAQAAAAEAAABgAw==" }
+function Options  { Send-IRCC "AAAAAQAAAAEAAAA2Aw==" }
+function Display  { Send-IRCC "AAAAAQAAAAEAAABKAw==" }
+
+# Direct HDMI inputs
+function HDMI1 { Send-IRCC "AAAAAgAAABoAAABaAw==" }
+function HDMI2 { Send-IRCC "AAAAAgAAABoAAABbAw==" }
+function HDMI3 { Send-IRCC "AAAAAgAAABoAAABcAw==" }
+function HDMI4 { Send-IRCC "AAAAAgAAABoAAABdAw==" }
+
+# =====================================================================
+#  FINE CONTROL (Scalar API) - read and write state with exact values
+# =====================================================================
+
+# Show what is on screen now (input/app)
+function TvStatus { Send-Scalar "avContent" '{"method":"getPlayingContentInfo","id":1,"version":"1.0","params":[]}' }
+
+# Show the TV's system info
+function TvInfo   { Send-Scalar "system" '{"method":"getSystemInformation","id":1,"version":"1.0","params":[]}' }
+
+# Read the current volume
+function VolGet   { Send-Scalar "audio" '{"method":"getVolumeInformation","id":1,"version":"1.0","params":[]}' }
+
+# Lock the volume at an exact value:  VolSet 10
+function VolSet($n){ Send-Scalar "audio" "{`"method`":`"setAudioVolume`",`"id`":1,`"version`":`"1.0`",`"params`":[{`"target`":`"speaker`",`"volume`":`"$n`"}]}" }
+
+# List the TV's available inputs
+function ListInputs { Send-Scalar "avContent" '{"method":"getCurrentExternalInputsStatus","id":1,"version":"1.0","params":[]}' }
+
+# Open a web page on the TV's browser
+function OpenPage($url){ Send-Scalar "appControl" "{`"method`":`"setActiveApp`",`"id`":1,`"version`":`"1.0`",`"params`":[{`"uri`":`"localapp://webappruntime?url=$url`"}]}" }
+
+Write-Host "TV functions loaded. Target IP: $($global:TV_IP)" -ForegroundColor Green
+Write-Host "Examples: PowerOn | PowerOff | VolSet 10 | SwitchInput | TvStatus | OpenPage 'https://example.com'" -ForegroundColor Green
