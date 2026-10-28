@@ -148,7 +148,24 @@ window read it from the assembly.
 
 Published builds of `SonyTvRemote.exe` go on the
 [GitHub Releases](https://github.com/FabioRueda/sony-bravia-ircc-control/releases)
-page. The `.exe` is not committed (binaries don't belong in git). To build it:
+page. The `.exe` is not committed (binaries don't belong in git).
+
+Latest: **[v1.2.0](https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.2.0)**.
+Check the download before running it (PowerShell):
+
+```powershell
+Get-FileHash .\SonyTvRemote.exe -Algorithm SHA256
+# expected for v1.2.0: AFC25D950278A8EEA17B74ABCB354B55020188C43159A22300A1AA3A36A1137B
+```
+
+Testing status of v1.2.0: unit tests pass, and the new Scalar calls (exact
+volume, input switch, clock, text-input gate) were checked against the real
+KDL-42W805A over the API. The on-screen behavior of the new IRCC keys (numbers,
+colors, media, Guide, Subtitle, Audio, Wide, Exit, Picture off, Sync menu) has
+not been checked by someone in front of the TV yet. Fixes, if any, will ship as
+v1.2.1.
+
+To build it:
 
 ```bash
 cd app
