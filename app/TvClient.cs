@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -99,6 +100,31 @@ namespace SonyTvRemote
                 if (cookie != null) req.Headers.TryAddWithoutValidation("Cookie", cookie);
             });
         }
+
+        // ---- 1.2.0 calls. Reads need no pairing; the writes do (see README). ----
+
+        public Task<TvReply> GetVolume() => QuickScalar("audio", "getVolumeInformation");
+
+        public Task<TvReply> SetVolume(int volume)
+            => Scalar("audio", "setAudioVolume",
+                new Dictionary<string, string> { ["target"] = "speaker", ["volume"] = volume.ToString(CultureInfo.InvariantCulture) });
+
+        public Task<TvReply> GetInputs() => QuickScalar("avContent", "getCurrentExternalInputsStatus");
+
+        public Task<TvReply> PlayInput(string uri)
+            => Scalar("avContent", "setPlayContent", new Dictionary<string, string> { ["uri"] = uri });
+
+        public Task<TvReply> GetAppStatus() => QuickScalar("appControl", "getApplicationStatusList");
+
+        // The TV's signature is setTextForm(string): the text itself is the only param.
+        public Task<TvReply> SendText(string text) => Scalar("appControl", "setTextForm", text);
+
+        public Task<TvReply> GetColorLayout() => QuickScalar("system", "getColorKeysLayout");
+
+        public Task<TvReply> GetCurrentTime() => QuickScalar("system", "getCurrentTime");
+
+        public Task<TvReply> SetClock(DateTimeOffset now, TimeZoneInfo zone)
+            => Scalar("system", "setCurrentTime", TvClock.Params(now, zone));
 
         // accessControl/actRegister. No PIN and no cookie: the TV shows a PIN and answers 401.
         // With the PIN: Basic auth with an empty user. With the cookie: renews without a PIN.

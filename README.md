@@ -32,7 +32,10 @@ What was tested on the KDL-42W805A (2026-10-28):
 | Power off, volume up/down, mute, input, arrows | ✅ | IRCC-IP, port 80, no pairing |
 | Power on from standby | ✅ Wake-on-LAN only | IRCC Power ON is ignored in standby; `setPowerStatus` answers error 15 |
 | Read state (power, volume, inputs) | ✅ | Scalar Web API, no pairing |
-| Set an exact volume (`setAudioVolume`) | ⚠️ Pairing required | Unpaired: HTTP 403 with `auth_url`. Not tested paired |
+| Set an exact volume (`setAudioVolume`) | ⚠️ Pairing required | Unpaired: HTTP 403 with `auth_url`. Paired: worked (set +1, read back, restored) |
+| Switch input (`setPlayContent`) | ⚠️ Pairing required | Paired: HDMI 1 and back worked. Unpaired: only the IRCC HDMI1–4 codes |
+| Set the TV clock (`setCurrentTime`) | ⚠️ Pairing required | `dateTime` must be UTC with a `Z` suffix; see [Windows app](#windows-app-sonytvremote) |
+| Type text (`setTextForm`) | ⚠️ Pairing required | Only with a text field open on the TV (`textInput` is `on`). The success path was not tested without someone at the TV |
 | Open a URL on the TV's browser | ⚠️ Pairing required | Works from the app after pairing (`https://example.com` opened). The script cannot pair |
 | Install a new app (APK/sideload) | ❌ | Not Android TV |
 | ADB over network | ❌ | Port 5555 closed |
@@ -64,15 +67,44 @@ A clickable remote window under [`app/`](app/), built with
 [Avalonia](https://avaloniaui.net/) so it **cross-compiles to Windows from any
 OS** (Linux included).
 
-- **Buttons:** Power On, Power Off, Mute, Vol −/+, Ch −/+, D-pad + OK, Back,
-  Home, Options, Display, Input, HDMI1–HDMI4, and "Open on TV" for a URL.
+- **Tabs** (1.2.0). The language selector, About, the TV IP / Pair row and the
+  status line stay visible on every tab:
+
+  | Tab | What is on it | Needs pairing? |
+  |---|---|---|
+  | **Remote** | Power On, Power Off, Mute, Vol −/+, Ch −/+, D-pad + OK, Back, Home, Options, Display, Input, HDMI1–HDMI4, "Open on TV" for a URL | Only "Open on TV" |
+  | **Numbers & colors** | Keys 0–9 and Enter; Red, Green, Yellow, Blue in the order the TV reports (`system/getColorKeysLayout`, default RGYB) | No |
+  | **Media** | Play, Pause, Stop, Rewind, Forward, Prev, Next | No |
+  | **Inputs** | List built from `avContent/getCurrentExternalInputsStatus` with the titles the TV reports and a ● when something is connected; Refresh button | Reading: no. Switching: yes (`setPlayContent`); unpaired, HDMI1–HDMI4 still work through their IRCC codes and the other inputs say "Not paired" |
+  | **More** | Guide, Subtitle, Audio, Wide, Exit, Picture off, Sync menu; exact volume slider; type text; Sync TV clock | Keys: no. Volume slider (set), type text, Sync TV clock: yes |
+
+- **Exact volume:** a slider from 0 to the TV's `maxVolume` with the current
+  number beside it. The volume is read (no pairing) when the More tab opens and
+  after every Vol −, Vol + and Mute click. `setAudioVolume` is sent only when
+  the slider is **released**, not on every pixel. Unpaired, the slider is
+  read-only and the tab says "Not paired — click Pair with TV".
+- **Type text:** the app asks `appControl/getApplicationStatusList` first. If
+  `textInput` is `off` it shows "Open a text field on the TV first" and does
+  **not** call `setTextForm`. If it is `on` (and the app is paired) it sends the
+  text with `setTextForm`.
+- **Sync TV clock:** `setCurrentTime` with the PC's time. On the KDL-42W805A
+  `dateTime` has to be **UTC with a `Z` suffix** (`2026-10-28T12:42:21Z`); local
+  times with an offset (`-03:00`, `-0300`) or none are refused with error 3
+  "Illegal argument". The TV keeps its own time zone, so the offsets in the
+  call are only informative. A TV that has never been set answers error 7
+  "Clock is not set" to `getCurrentTime` until this runs.
+- **Not supported by this TV:** if the TV answers error 12 (no such method), 14
+  (unsupported version) or 15 (unsupported operation), or HTTP 404, the app
+  shows "Not supported by this TV" and keeps working.
 - **IRCC codes from the TV itself:** on the first button press the app reads
   `system/getRemoteControllerInfo` and uses the TV's own codes by name
-  (Back sends `Return`, not `Exit`). If that call fails, it uses a built-in
-  table of the official KDL-42W805A codes. HDMI1–HDMI4 are not in the TV's
-  list and use the standard BRAVIA codes.
-- **Pair with TV:** see [Pairing](#pairing-pin). Needed for "Open on TV".
-  Unpaired, the app shows "Not paired — click Pair with TV".
+  (Back sends `Return`, not `Exit`; Guide sends `EPG`, or `GGuide` if the TV has
+  no `EPG`). If that call fails, it uses a built-in table of the official
+  KDL-42W805A codes, which now also holds the 1.2.0 keys. HDMI1–HDMI4 are not
+  in the TV's list and use the standard BRAVIA codes.
+- **Pair with TV:** see [Pairing](#pairing-pin). Needed for "Open on TV", the
+  exact volume, switching inputs from the list, typing text and syncing the
+  clock. Unpaired, the app shows "Not paired — click Pair with TV".
 - **Power On:** see [Power on with Wake-on-LAN](#power-on-with-wake-on-lan).
 - **Language selector:** English (US) (default) or Português (Brasil). The
   switch applies immediately to every text, including the status line and the
@@ -89,6 +121,18 @@ OS** (Linux included).
   uses the MAC saved for that IP, and the cookie saved for that IP is the only
   one sent to it. A settings file from 1.1.0 is migrated automatically to the
   saved IP.
+
+### What the app deliberately does not include
+
+- `deleteContent`, `setDeleteProtection`: they delete recordings or change their
+  protection.
+- `setLanguage`, `setPostalCode`, `setPowerSavingMode`: they change TV settings.
+- `setWolMode`: it can turn off Wake-on-LAN, which is the **only** way to power
+  this TV on from standby. Without Wake-on-LAN it could only be turned on with
+  the original remote.
+- The Japanese keys (BS, CS, Ddata, acTVila, Analog, Digital): they do nothing
+  on a Brazilian TV.
+- Netflix, InternetVideo and InternetWidgets: those services were shut down.
 
 > **Reserve the TV's IP in your router** (DHCP reservation / static lease). The
 > app knows a TV only by its IP. If the TV gets a new IP, the app treats it as a
@@ -121,7 +165,9 @@ with nothing else installed. It is unsigned, so Windows SmartScreen will warn
 on first run (More info → Run anyway).
 
 Unit tests (version, translations, Wake-on-LAN packet, URL handling, IRCC code
-parsing, cookie handling, settings, power-on sequence):
+parsing and the built-in table, cookie handling, settings, power-on sequence,
+inputs list, volume limits, color-key order, TV clock format, text-input gate,
+error classification, request formats):
 
 ```bash
 dotnet test tests/TvRemote.Tests

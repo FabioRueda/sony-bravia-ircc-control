@@ -40,6 +40,45 @@ namespace SonyTvRemote
             ["OpenOnTv"] = "Open on TV",
             ["UrlHint"] = "URL",
 
+            ["TabRemote"] = "Remote",
+            ["TabNumbers"] = "Numbers & colors",
+            ["TabMedia"] = "Media",
+            ["TabInputs"] = "Inputs",
+            ["TabMore"] = "More",
+            ["Enter"] = "Enter",
+            ["Red"] = "Red",
+            ["Green"] = "Green",
+            ["Yellow"] = "Yellow",
+            ["Blue"] = "Blue",
+            ["Play"] = "Play",
+            ["Pause"] = "Pause",
+            ["Stop"] = "Stop",
+            ["Rewind"] = "Rewind",
+            ["Forward"] = "Forward",
+            ["Prev"] = "Prev",
+            ["Next"] = "Next",
+            ["Guide"] = "Guide",
+            ["Subtitle"] = "Subtitle",
+            ["Audio"] = "Audio",
+            ["Wide"] = "Wide",
+            ["Exit"] = "Exit",
+            ["PicOff"] = "Picture off",
+            ["SyncMenu"] = "Sync menu",
+            ["Refresh"] = "Refresh",
+            ["InputsEmpty"] = "No inputs found. Click Refresh.",
+            ["InputSwitched"] = "Switched to {0}.",
+            ["InputConnected"] = "connected",
+            ["VolumeExact"] = "Exact volume:",
+            ["VolumeSet"] = "Volume set to {0}.",
+            ["TextHint"] = "Text to type on the TV",
+            ["SendText"] = "Send text",
+            ["TextFieldOff"] = "Open a text field on the TV first",
+            ["TextSent"] = "Text sent to the TV.",
+            ["SyncClock"] = "Sync TV clock",
+            ["ClockSet"] = "TV clock set.",
+            ["ClockSetRead"] = "TV clock set. The TV now reads {0}.",
+            ["NotSupported"] = "Not supported by this TV",
+
             ["Ready"] = "Ready. Set the TV IP and click.",
             ["EnterIp"] = "Enter the TV IP.",
             ["InvalidIp"] = "Invalid TV IP. Example: 192.168.1.100",
@@ -71,7 +110,22 @@ namespace SonyTvRemote
             ["History"] = "Version history",
             ["Close"] = "Close",
             ["ChangelogText"] =
-@"1.1.1 — 2026-10-28
+@"1.2.0 — 2026-10-28
+
+Added
+• Tabs: Remote (everything that was already there), Numbers & colors, Media, Inputs and More. Language, About, the TV IP and the status line stay visible on every tab.
+• Number keys 0-9 and Enter, and the Red, Green, Yellow and Blue keys, in the order the TV reports (system/getColorKeysLayout; default RGYB).
+• Media keys: Play, Pause, Stop, Rewind, Forward, Prev, Next.
+• Inputs list built from the TV (avContent/getCurrentExternalInputsStatus) with its own titles and a ""connected"" sign, and a Refresh button. Click an input to switch to it (needs pairing). Unpaired, HDMI1-HDMI4 use the IRCC codes and the other inputs show ""Not paired"".
+• Exact volume: a slider from 0 to the TV's maximum with the current number beside it. The volume is read when the More tab opens and after Vol -, Vol + and Mute, and is set (needs pairing) only when you release the slider. Unpaired, the slider is read-only.
+• Type text on the TV (needs pairing): asks the TV first and says ""Open a text field on the TV first"" when none is open.
+• Sync TV clock (needs pairing): sets the TV clock from the PC clock.
+• Extra keys on More: Guide, Subtitle, Audio, Wide, Exit, Picture off, Sync menu.
+• A TV that answers error 12, 14 or 15 (or has no such method) gets ""Not supported by this TV"" instead of a generic error.
+
+Not included on purpose: deleteContent, setDeleteProtection, setLanguage, setPostalCode, setWolMode, setPowerSavingMode (they delete recordings or change TV settings; setWolMode could turn off the Wake-on-LAN that powers this TV on), the Japanese keys (BS, CS, Ddata, acTVila, Analog, Digital) and the Netflix, InternetVideo and InternetWidgets keys (services shut down).
+
+1.1.1 — 2026-10-28
 
 Fixed
 • Wake-on-LAN MAC and pairing are now stored per TV (by IP); switching the IP no longer wakes or sends the cookie to the previous TV.
@@ -138,6 +192,45 @@ Added
             ["OpenOnTv"] = "Abrir na TV",
             ["UrlHint"] = "Endereço (URL)",
 
+            ["TabRemote"] = "Controle",
+            ["TabNumbers"] = "Números e cores",
+            ["TabMedia"] = "Mídia",
+            ["TabInputs"] = "Entradas",
+            ["TabMore"] = "Mais",
+            ["Enter"] = "Enter",
+            ["Red"] = "Vermelho",
+            ["Green"] = "Verde",
+            ["Yellow"] = "Amarelo",
+            ["Blue"] = "Azul",
+            ["Play"] = "Play",
+            ["Pause"] = "Pausar",
+            ["Stop"] = "Parar",
+            ["Rewind"] = "Retroceder",
+            ["Forward"] = "Avançar",
+            ["Prev"] = "Anterior",
+            ["Next"] = "Próximo",
+            ["Guide"] = "Guia",
+            ["Subtitle"] = "Legenda",
+            ["Audio"] = "Áudio",
+            ["Wide"] = "Wide",
+            ["Exit"] = "Sair",
+            ["PicOff"] = "Apagar imagem",
+            ["SyncMenu"] = "Menu Sync",
+            ["Refresh"] = "Atualizar",
+            ["InputsEmpty"] = "Nenhuma entrada encontrada. Clique em Atualizar.",
+            ["InputSwitched"] = "Mudou para {0}.",
+            ["InputConnected"] = "conectada",
+            ["VolumeExact"] = "Volume exato:",
+            ["VolumeSet"] = "Volume ajustado para {0}.",
+            ["TextHint"] = "Texto para digitar na TV",
+            ["SendText"] = "Enviar texto",
+            ["TextFieldOff"] = "Abra um campo de texto na TV primeiro",
+            ["TextSent"] = "Texto enviado para a TV.",
+            ["SyncClock"] = "Acertar relógio da TV",
+            ["ClockSet"] = "Relógio da TV acertado.",
+            ["ClockSetRead"] = "Relógio da TV acertado. A TV agora marca {0}.",
+            ["NotSupported"] = "Não suportado por esta TV",
+
             ["Ready"] = "Pronto. Confira o IP da TV e clique.",
             ["EnterIp"] = "Digite o IP da TV.",
             ["InvalidIp"] = "IP da TV inválido. Exemplo: 192.168.1.100",
@@ -169,7 +262,22 @@ Added
             ["History"] = "Histórico de versões",
             ["Close"] = "Fechar",
             ["ChangelogText"] =
-@"1.1.1 — 28/10/2026
+@"1.2.0 — 28/10/2026
+
+Novo
+• Abas: Controle (tudo o que já existia), Números e cores, Mídia, Entradas e Mais. Idioma, Sobre, o IP da TV e a linha de status ficam sempre visíveis.
+• Teclado numérico 0-9 e Enter, e as teclas Vermelho, Verde, Amarelo e Azul, na ordem que a TV informa (system/getColorKeysLayout; padrão RGYB).
+• Teclas de mídia: Play, Pausar, Parar, Retroceder, Avançar, Anterior, Próximo.
+• Lista de entradas montada com os dados da TV (avContent/getCurrentExternalInputsStatus), com o título que ela informa e um sinal de ""conectada"", e botão Atualizar. Clique numa entrada para mudar para ela (exige pareamento). Sem pareamento, HDMI1-HDMI4 usam os códigos IRCC e as outras entradas mostram ""Não pareado"".
+• Volume exato: barra de 0 até o máximo da TV, com o número atual ao lado. O volume é lido ao abrir a aba Mais e depois de Vol -, Vol + e Mudo, e só é mudado (exige pareamento) quando você solta a barra. Sem pareamento, a barra é só de leitura.
+• Digitar texto na TV (exige pareamento): pergunta à TV antes e avisa ""Abra um campo de texto na TV primeiro"" quando não há campo aberto.
+• Acertar relógio da TV (exige pareamento): acerta o relógio da TV com a hora do PC.
+• Teclas extras em Mais: Guia, Legenda, Áudio, Wide, Sair, Apagar imagem, Menu Sync.
+• Quando a TV responde erro 12, 14 ou 15 (ou não tem o método), aparece ""Não suportado por esta TV"" em vez de um erro genérico.
+
+Não incluído de propósito: deleteContent, setDeleteProtection, setLanguage, setPostalCode, setWolMode, setPowerSavingMode (apagam gravações ou mudam configurações da TV; o setWolMode poderia desligar o Wake-on-LAN, que é o que liga esta TV), as teclas japonesas (BS, CS, Ddata, acTVila, Analog, Digital) e as teclas Netflix, InternetVideo e InternetWidgets (serviços desligados).
+
+1.1.1 — 28/10/2026
 
 Corrigido
 • O MAC do Wake-on-LAN e o pareamento agora ficam guardados por TV (pelo IP); trocar o IP não liga mais a TV anterior nem manda o cookie para ela.

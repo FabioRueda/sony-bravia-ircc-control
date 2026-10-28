@@ -123,6 +123,38 @@ namespace SonyTvRemote
             ["Mute"]        = "AAAAAQAAAAEAAAAUAw==",
             ["ChannelUp"]   = "AAAAAQAAAAEAAAAQAw==",
             ["ChannelDown"] = "AAAAAQAAAAEAAAARAw==",
+
+            // Added in 1.2.0, read from the same list (KDL-42W805A, 2026-10-28).
+            ["Num1"]        = "AAAAAQAAAAEAAAAAAw==",
+            ["Num2"]        = "AAAAAQAAAAEAAAABAw==",
+            ["Num3"]        = "AAAAAQAAAAEAAAACAw==",
+            ["Num4"]        = "AAAAAQAAAAEAAAADAw==",
+            ["Num5"]        = "AAAAAQAAAAEAAAAEAw==",
+            ["Num6"]        = "AAAAAQAAAAEAAAAFAw==",
+            ["Num7"]        = "AAAAAQAAAAEAAAAGAw==",
+            ["Num8"]        = "AAAAAQAAAAEAAAAHAw==",
+            ["Num9"]        = "AAAAAQAAAAEAAAAIAw==",
+            ["Num0"]        = "AAAAAQAAAAEAAAAJAw==",
+            ["Enter"]       = "AAAAAQAAAAEAAAALAw==",
+            ["Red"]         = "AAAAAgAAAJcAAAAlAw==",
+            ["Green"]       = "AAAAAgAAAJcAAAAmAw==",
+            ["Yellow"]      = "AAAAAgAAAJcAAAAnAw==",
+            ["Blue"]        = "AAAAAgAAAJcAAAAkAw==",
+            ["Play"]        = "AAAAAgAAAJcAAAAaAw==",
+            ["Pause"]       = "AAAAAgAAAJcAAAAZAw==",
+            ["Stop"]        = "AAAAAgAAAJcAAAAYAw==",
+            ["Rewind"]      = "AAAAAgAAAJcAAAAbAw==",
+            ["Forward"]     = "AAAAAgAAAJcAAAAcAw==",
+            ["Prev"]        = "AAAAAgAAAJcAAAA8Aw==",
+            ["Next"]        = "AAAAAgAAAJcAAAA9Aw==",
+            ["SubTitle"]    = "AAAAAgAAAJcAAAAoAw==",
+            ["Audio"]       = "AAAAAQAAAAEAAAAXAw==",
+            ["Wide"]        = "AAAAAgAAAKQAAAA9Aw==",
+            ["Exit"]        = "AAAAAQAAAAEAAABjAw==",
+            ["PicOff"]      = "AAAAAQAAAAEAAAA+Aw==",
+            ["SyncMenu"]    = "AAAAAgAAABoAAABYAw==",
+            ["EPG"]         = "AAAAAgAAAKQAAABbAw==",   // the Guide button
+            ["GGuide"]      = "AAAAAQAAAAEAAAAOAw==",   // Guide on a TV with no EPG code
         };
 
         // Not in the TV's list; the standard BRAVIA codes.
@@ -161,7 +193,20 @@ namespace SonyTvRemote
             if (fromTv != null && fromTv.TryGetValue(name, out var code)) return code;
             return Fallback[name];
         }
+
+        // The Guide button: "EPG" on the TV's list, else "GGuide", else the built-in EPG code.
+        public static string ResolveGuide(IReadOnlyDictionary<string, string> fromTv)
+        {
+            if (fromTv != null)
+            {
+                if (fromTv.TryGetValue("EPG", out var epg)) return epg;
+                if (fromTv.TryGetValue("GGuide", out var gguide)) return gguide;
+            }
+            return Fallback["EPG"];
+        }
     }
+
+    public enum ScalarOutcome { Ok, NoResponse, NotPaired, NotSupported, TvError, HttpFailed }
 
     public static class ScalarReply
     {
@@ -184,6 +229,62 @@ namespace SonyTvRemote
                         && err.ValueKind == JsonValueKind.Array && err.GetArrayLength() > 0
                         && err[0].TryGetInt32(out var code))
                         return code;
+                }
+            }
+            catch (Exception) { }
+            return null;
+        }
+
+        // Error 12 (no such method), 14 (unsupported version) and 15 (unsupported operation), or an
+        // unknown service/method path (HTTP 404). Pairing errors are never "unsupported".
+        public static bool IsUnsupported(int status, string body)
+        {
+            if (NeedsAuth(status, body)) return false;
+            if (status == 404) return true;
+            var code = ErrorCode(body);
+            return code == 12 || code == 14 || code == 15;
+        }
+
+        // One verdict per reply, so every feature reports problems the same way.
+        public static ScalarOutcome Classify(int status, string body)
+        {
+            if (status == 0) return ScalarOutcome.NoResponse;
+            if (NeedsAuth(status, body)) return ScalarOutcome.NotPaired;
+            if (IsUnsupported(status, body)) return ScalarOutcome.NotSupported;
+            if (ErrorCode(body) != null) return ScalarOutcome.TvError;
+            return status == 200 ? ScalarOutcome.Ok : ScalarOutcome.HttpFailed;
+        }
+
+        // Status of one entry of appControl/getApplicationStatusList ("textInput", ...); null if absent.
+        public static string AppStatus(string body, string name)
+        {
+            try
+            {
+                using (var doc = JsonDocument.Parse(body))
+                {
+                    if (!doc.RootElement.TryGetProperty("result", out var r) || r.GetArrayLength() == 0) return null;
+                    foreach (var item in r[0].EnumerateArray())
+                    {
+                        if (item.TryGetProperty("name", out var n) && n.GetString() == name
+                            && item.TryGetProperty("status", out var s))
+                            return s.GetString();
+                    }
+                }
+            }
+            catch (Exception) { }
+            return null;
+        }
+
+        // The string from system/getCurrentTime; null when the clock isn't set or the reply is unusable.
+        public static string CurrentTime(string body)
+        {
+            try
+            {
+                using (var doc = JsonDocument.Parse(body))
+                {
+                    if (doc.RootElement.TryGetProperty("result", out var r) && r.GetArrayLength() > 0
+                        && r[0].ValueKind == JsonValueKind.String)
+                        return r[0].GetString();
                 }
             }
             catch (Exception) { }

@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-10-28
+
+### Added
+- Tabs: **Remote** (everything that was already there), **Numbers & colors**, **Media**, **Inputs** and **More**. Language, About, the TV IP and the status line stay visible on every tab.
+- Number keys 0-9 and Enter, and the Red, Green, Yellow and Blue keys, in the order the TV reports (`system/getColorKeysLayout`; default RGYB).
+- Media keys: Play, Pause, Stop, Rewind, Forward, Prev, Next.
+- Inputs list built from the TV (`avContent/getCurrentExternalInputsStatus`) with the titles it reports, a "connected" sign and a Refresh button. Clicking an input switches to it with `setPlayContent` (needs pairing). Unpaired, HDMI1-HDMI4 use the IRCC codes and the other inputs show "Not paired".
+- Exact volume: a slider from 0 to the TV's `maxVolume` with the current number beside it. The volume is read when the More tab opens and after Vol -, Vol + and Mute; `setAudioVolume` is sent only when the slider is released (needs pairing). Unpaired, the slider is read-only.
+- Type text on the TV (needs pairing): reads `getApplicationStatusList` first and says "Open a text field on the TV first" when `textInput` is off; otherwise sends `setTextForm`.
+- Sync TV clock (needs pairing): `setCurrentTime` with the PC time. On the KDL-42W805A `dateTime` must be UTC with a `Z` suffix.
+- Extra keys on More: Guide (`EPG`, else `GGuide`), Subtitle, Audio, Wide, Exit, Picture off, Sync menu.
+- A TV that answers error 12, 14 or 15 (or HTTP 404) gets "Not supported by this TV" instead of a generic error.
+- The built-in IRCC table (`IrccCodes.Fallback`) now has all the new codes, read from the KDL-42W805A on 2026-10-28.
+
+### Not included on purpose
+- `deleteContent`, `setDeleteProtection`, `setLanguage`, `setPostalCode`, `setWolMode`, `setPowerSavingMode`: they delete recordings or change TV settings. `setWolMode` could turn off Wake-on-LAN, the only way to power this TV on.
+- The Japanese keys (BS, CS, Ddata, acTVila, Analog, Digital) and the Netflix, InternetVideo and InternetWidgets keys (services shut down).
+
 ## [1.1.1] - 2026-10-28
 
 ### Fixed
@@ -41,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial version, never published as a release: Windows GUI remote (Avalonia) with power, volume, D-pad, inputs, channels and "open a URL on the TV", plus the PowerShell script.
 
-[1.1.1]: https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.1.1
+[1.2.0]: https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.2.0
+[1.1.1]: https://github.com/FabioRueda/sony-bravia-ircc-control/commit/a8ddbfd
 [1.1.0]: https://github.com/FabioRueda/sony-bravia-ircc-control/commit/d43f6f0
 [1.0.0]: https://github.com/FabioRueda/sony-bravia-ircc-control/commit/047a63b
