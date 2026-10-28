@@ -196,7 +196,7 @@ namespace SonyTvRemote.Tests
         };
 
         public static readonly string[] Excluded =
-            { "BS", "CS", "Ddata", "acTVila", "Analog", "Digital", "Netflix", "InternetVideo", "InternetWidgets" };
+            { "BS", "CS", "Ddata", "acTVila", "Digital", "Netflix", "InternetVideo", "InternetWidgets" };
 
         [Fact]
         public void Fallback_has_every_new_key_with_a_base64_code()
@@ -558,13 +558,13 @@ namespace SonyTvRemote.Tests
         }
 
         [Fact]
-        public void Changelog_describes_1_2_0_in_both_languages()
+        public void Changelog_describes_1_3_0_in_both_languages()
         {
             foreach (var lang in new[] { Lang.EnUs, Lang.PtBr })
             {
                 var text = Strings.Get(lang, "ChangelogText");
-                Assert.StartsWith("1.2.0 ", text);
-                Assert.Contains("1.1.1", text);
+                Assert.StartsWith("1.3.0 ", text);
+                Assert.Contains("1.2.0", text);
             }
         }
     }

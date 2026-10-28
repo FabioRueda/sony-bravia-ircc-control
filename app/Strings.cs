@@ -78,6 +78,14 @@ namespace SonyTvRemote
             ["ClockSet"] = "TV clock set.",
             ["ClockSetRead"] = "TV clock set. The TV now reads {0}.",
             ["NotSupported"] = "Not supported by this TV",
+            ["Ant"] = "ANT",
+            ["AntTip"] = "ANT: switch Antenna / Cable",
+            ["TipReturn"] = "RETURN",
+            ["TipHome"] = "HOME",
+            ["TipOptions"] = "OPTIONS",
+            ["TipDisplay"] = "DISPLAY",
+            ["AllKeysLabel"] = "All TV keys:",
+            ["SendKey"] = "Send",
 
             ["Ready"] = "Ready. Set the TV IP and click.",
             ["EnterIp"] = "Enter the TV IP.",
@@ -110,7 +118,30 @@ namespace SonyTvRemote
             ["History"] = "Version history",
             ["Close"] = "Close",
             ["ChangelogText"] =
-@"1.2.0 — 2026-10-28
+@"1.3.0 — 2026-10-28
+
+Added
+• A fixed bar with Back, Home, Options and Display under the tabs, visible on every tab (tooltips: RETURN, HOME, OPTIONS, DISPLAY).
+• ANT button on the Remote tab (HDMI3 | HDMI4 | ANT): switches the tuner between Antenna and Cable.
+• ""All TV keys"" list on the More tab: every key the TV publishes, sorted, with a Send button.
+• Enter in the URL field opens the page; Enter in the text field sends the text.
+• The Inputs tab refreshes itself every 3 seconds while it is open, so the green dot follows the devices turning on and off.
+• The volume bar follows the remote control: while the More tab is open it is re-read every 2 seconds.
+• The volume now changes while you drag the bar or use the arrow, PageUp, PageDown, Home and End keys (at most one send every 250 ms; the last value is always sent).
+
+Changed
+• Tabs are easier to see: 14 pt text, a border on every tab and a highlighted, bold selected tab.
+• Number pad: the last row is now Enter | 0 | OK. Enter is sent as before; OK sends Confirm, which acts at once.
+• The Back, Home, Options and Display row moved from the Remote tab to the fixed bar.
+• The window is taller (780 px).
+
+Fixed
+• The connected dot in the Inputs list no longer shifts the name to the left: every row uses an indicator of the same width.
+• ""Analog"" is the ANT key (Antenna / Cable) on Brazilian TVs, not only a Japanese key.
+
+Not included on purpose: the keys BS, CS, BSCS, Ddata, acTVila, RakurakuStart, Netflix, InternetVideo, InternetWidgets and DeleteVideo are left out of the keys list.
+
+1.2.0 — 2026-10-28
 
 Added
 • Tabs: Remote (everything that was already there), Numbers & colors, Media, Inputs and More. Language, About, the TV IP and the status line stay visible on every tab.
@@ -230,6 +261,14 @@ Added
             ["ClockSet"] = "Relógio da TV acertado.",
             ["ClockSetRead"] = "Relógio da TV acertado. A TV agora marca {0}.",
             ["NotSupported"] = "Não suportado por esta TV",
+            ["Ant"] = "ANT",
+            ["AntTip"] = "ANT: alterna Antena / Cabo",
+            ["TipReturn"] = "RETURN",
+            ["TipHome"] = "HOME",
+            ["TipOptions"] = "OPTIONS",
+            ["TipDisplay"] = "DISPLAY",
+            ["AllKeysLabel"] = "Todas as teclas da TV:",
+            ["SendKey"] = "Enviar",
 
             ["Ready"] = "Pronto. Confira o IP da TV e clique.",
             ["EnterIp"] = "Digite o IP da TV.",
@@ -262,7 +301,30 @@ Added
             ["History"] = "Histórico de versões",
             ["Close"] = "Fechar",
             ["ChangelogText"] =
-@"1.2.0 — 28/10/2026
+@"1.3.0 — 28/10/2026
+
+Novo
+• Barra fixa com Voltar, Início, Opções e Display abaixo das abas, visível em todas as abas (dicas: RETURN, HOME, OPTIONS, DISPLAY).
+• Botão ANT na aba Controle (HDMI3 | HDMI4 | ANT): alterna o sintonizador entre Antena e Cabo.
+• Lista ""Todas as teclas da TV"" na aba Mais: todas as teclas que a TV informa, em ordem alfabética, com botão Enviar.
+• Enter no campo de endereço abre a página; Enter no campo de texto envia o texto.
+• A aba Entradas se atualiza sozinha a cada 3 segundos enquanto está aberta, e a bolinha verde acompanha os aparelhos ligando e desligando.
+• A barra de volume acompanha o controle remoto: com a aba Mais aberta, ela é lida de novo a cada 2 segundos.
+• O volume agora muda enquanto você arrasta a barra ou usa as teclas Seta, PageUp, PageDown, Home e End (no máximo 1 envio a cada 250 ms; o último valor sempre é enviado).
+
+Mudou
+• As abas ficaram mais visíveis: texto de 14, borda em cada aba e aba selecionada em destaque e em negrito.
+• Teclado numérico: a última linha agora é Enter | 0 | OK. O Enter é enviado como antes; o OK envia Confirm, que age na hora.
+• A linha Voltar, Início, Opções e Display saiu da aba Controle e foi para a barra fixa.
+• A janela ficou mais alta (780 px).
+
+Corrigido
+• A bolinha de entrada conectada não empurra mais o nome para a esquerda: todas as linhas usam um indicador do mesmo tamanho.
+• ""Analog"" é a tecla ANT (Antena / Cabo) nas TVs brasileiras, não só uma tecla japonesa.
+
+Não incluído de propósito: as teclas BS, CS, BSCS, Ddata, acTVila, RakurakuStart, Netflix, InternetVideo, InternetWidgets e DeleteVideo ficam fora da lista de teclas.
+
+1.2.0 — 28/10/2026
 
 Novo
 • Abas: Controle (tudo o que já existia), Números e cores, Mídia, Entradas e Mais. Idioma, Sobre, o IP da TV e a linha de status ficam sempre visíveis.

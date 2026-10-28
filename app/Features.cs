@@ -5,7 +5,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-// UI-free logic for the 1.2.0 features: inputs list, exact volume, color keys, TV clock.
+// UI-free logic for the 1.2.0 and 1.3.0 features: inputs list, exact volume (and its send limiter),
+// color keys, TV clock, the all-keys list and the rules for the automatic reads.
 // Covered by tests/TvRemote.Tests/FeaturesTests.cs.
 
 namespace SonyTvRemote
@@ -41,6 +42,17 @@ namespace SonyTvRemote
             }
             catch (Exception) { list.Clear(); }
             return list;
+        }
+
+        // True when both lists show the same thing: same order, title, uri and connection.
+        // The automatic refresh redraws only when this is false.
+        public static bool SameList(IList<TvInput> a, IList<TvInput> b)
+        {
+            if (a == null || b == null) return a == b;
+            if (a.Count != b.Count) return false;
+            for (int i = 0; i < a.Count; i++)
+                if (a[i].Title != b[i].Title || a[i].Uri != b[i].Uri || a[i].Connected != b[i].Connected) return false;
+            return true;
         }
 
         // Without pairing only the IRCC HDMI1-4 codes can switch input. Null for anything else.
@@ -175,5 +187,100 @@ namespace SonyTvRemote
                 ["dstOffsetMinute"] = (int)dst.TotalMinutes
             };
         }
+    }
+
+    // The "All TV keys" list on the More tab.
+    public static class AllKeys
+    {
+        // Keys that stay out of the list: Japanese-only keys, services that were shut down,
+        // and DeleteVideo, which can erase a recording.
+        public static readonly string[] Excluded =
+            { "BS", "CS", "BSCS", "Ddata", "acTVila", "RakurakuStart", "Netflix", "InternetVideo", "InternetWidgets", "DeleteVideo" };
+
+        // The names the TV published (or, without them, the built-in table), minus the excluded
+        // ones, sorted without regard to case.
+        public static List<string> Build(IEnumerable<string> fromTv)
+        {
+            var names = fromTv ?? IrccCodes.Fallback.Keys;
+            var list = names
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Where(n => !Excluded.Contains(n, StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            list.Sort(StringComparer.OrdinalIgnoreCase);
+            return list;
+        }
+    }
+
+    // Limits the volume sent while the slider moves: at most one send per Interval, the latest
+    // value always wins, and the final value goes out on release. Time is passed in.
+    public class VolumeThrottle
+    {
+        public static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(250);
+
+        private int _lastSent;
+        private int? _pending;
+        private TimeSpan? _lastSentAt;
+
+        public VolumeThrottle(int applied) { _lastSent = applied; }
+
+        public bool HasPending => _pending != null;
+
+        // The TV's own value is now the reference; anything waiting is dropped.
+        public void Reset(int applied)
+        {
+            _lastSent = applied;
+            _pending = null;
+            _lastSentAt = null;
+        }
+
+        // The slider moved. Returns the value to send right now, or null (wait for Take).
+        public int? Offer(int value, TimeSpan now)
+        {
+            _pending = value;
+            return Take(now);
+        }
+
+        // Called by a timer while the slider is held: the waiting value, once Interval has passed.
+        public int? Take(TimeSpan now)
+        {
+            if (_pending == null) return null;
+            if (_pending == _lastSent) { _pending = null; return null; }
+            if (_lastSentAt != null && now - _lastSentAt.Value < Interval) return null;
+            return Send(now);
+        }
+
+        // The slider was released with this value: sent at once unless it is already the last one sent.
+        public int? Release(int value, TimeSpan now)
+        {
+            _pending = value;
+            if (value == _lastSent) { _pending = null; return null; }
+            return Send(now);
+        }
+
+        private int Send(TimeSpan now)
+        {
+            _lastSent = _pending.Value;
+            _lastSentAt = now;
+            _pending = null;
+            return _lastSent;
+        }
+    }
+
+    // When the automatic reads may run.
+    public static class AutoRead
+    {
+        public static readonly TimeSpan VolumeQuietAfterSend = TimeSpan.FromSeconds(2);
+
+        // No volume read while the slider is held, within 2 s of a send from the app, or while
+        // another read or send is still running. sinceSend is null when nothing was sent yet.
+        public static bool VolumeAllowed(bool sliderHeld, TimeSpan? sinceSend, bool busy)
+        {
+            if (sliderHeld || busy) return false;
+            return sinceSend == null || sinceSend.Value >= VolumeQuietAfterSend;
+        }
+
+        // The inputs refresh only needs the previous read to be finished.
+        public static bool InputsAllowed(bool busy) => !busy;
     }
 }

@@ -155,6 +155,9 @@ namespace SonyTvRemote
             ["SyncMenu"]    = "AAAAAgAAABoAAABYAw==",
             ["EPG"]         = "AAAAAgAAAKQAAABbAw==",   // the Guide button
             ["GGuide"]      = "AAAAAQAAAAEAAAAOAw==",   // Guide on a TV with no EPG code
+
+            // Added in 1.3.0: the ANT key (Antenna / Cable). Checked on the KDL-42W805A in front of the TV.
+            ["Analog"]      = "AAAAAgAAAHcAAAANAw==",
         };
 
         // Not in the TV's list; the standard BRAVIA codes.

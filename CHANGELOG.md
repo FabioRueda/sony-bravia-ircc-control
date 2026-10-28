@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-28
+
+### Added
+- A fixed navigation bar under the tabs, on every tab: Back (`Return`), Home, Options and Display. Tooltips show the names printed on the original remote: RETURN, HOME, OPTIONS, DISPLAY.
+- **ANT** button on the Remote tab (HDMI3 | HDMI4 | ANT). It sends the `Analog` key, which switches the tuner between Antenna and Cable on a Brazilian TV. `Analog` is now in `IrccCodes.Fallback`.
+- "All TV keys" list on the More tab: a drop-down with every key name from `system/getRemoteControllerInfo` (built-in table if the TV does not answer), sorted, and a Send button.
+- Enter in the URL field does what "Open on TV" does; Enter in the "Text to type on the TV" field does what "Send text" does.
+- The Inputs tab refreshes itself every 3 seconds while it is selected and the window is not minimized (`getCurrentExternalInputsStatus`). The list is redrawn only when it changed. A failed automatic read shows nothing.
+- The volume bar follows the remote control: while the More tab is selected and the window is not minimized, `getVolumeInformation` is read every 2 seconds. It is skipped while you hold the bar, for 2 seconds after the app sent a volume, and while a read is running. A value that comes from the TV is never sent back.
+- The volume changes while you drag the bar and on every arrow, PageUp, PageDown, Home and End key: `setAudioVolume` at most once every 250 ms, always with the latest value, and the final value on release if it differs from the last one sent.
+
+### Changed
+- Tabs are easier to see: 14 pt dark text, a border on every header and a highlighted, bold selected tab.
+- Number pad: the last row is now Enter | 0 | OK. Enter sends `Enter`, as before. OK sends `Confirm`, which acts at once (on the KDL-42W805A, `Confirm` changed the channel immediately and `Enter` only after the wait time).
+- The Back, Home, Options and Display row moved from the Remote tab to the fixed bar.
+- The window is 780 px tall.
+
+### Fixed
+- The connected dot in the Inputs list was smaller than the empty one and pushed the name about 5 px to the left. Every row now has a fixed-width indicator, so all names start at the same place.
+- Corrected the 1.2.0 note below: `Analog` is not only a Japanese key. On Brazilian TVs it is the ANT key (Antenna / Cable). `Digital`, `Analog2` and `Analog?` do nothing on the KDL-42W805A.
+
+### Not included on purpose
+- From the "All TV keys" list: BS, CS, BSCS, Ddata, acTVila, RakurakuStart (Japanese keys), Netflix, InternetVideo, InternetWidgets (services shut down) and DeleteVideo (it can delete a recording).
+
 ## [1.2.0] - 2026-10-28
 
 ### Added
@@ -21,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Not included on purpose
 - `deleteContent`, `setDeleteProtection`, `setLanguage`, `setPostalCode`, `setWolMode`, `setPowerSavingMode`: they delete recordings or change TV settings. `setWolMode` could turn off Wake-on-LAN, the only way to power this TV on.
-- The Japanese keys (BS, CS, Ddata, acTVila, Analog, Digital) and the Netflix, InternetVideo and InternetWidgets keys (services shut down).
+- The Japanese keys (BS, CS, Ddata, acTVila, Analog, Digital) and the Netflix, InternetVideo and InternetWidgets keys (services shut down). *Correction (1.3.0): on Brazilian TVs `Analog` is the ANT key (Antenna / Cable), and 1.3.0 adds it.*
 
 ## [1.1.1] - 2026-10-28
 

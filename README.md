@@ -67,22 +67,51 @@ A clickable remote window under [`app/`](app/), built with
 [Avalonia](https://avaloniaui.net/) so it **cross-compiles to Windows from any
 OS** (Linux included).
 
-- **Tabs** (1.2.0). The language selector, About, the TV IP / Pair row and the
-  status line stay visible on every tab:
+- **Tabs** (1.2.0, easier to see in 1.3.0). The language selector, About, the
+  TV IP / Pair row, the fixed navigation bar and the status line stay visible
+  on every tab:
 
   | Tab | What is on it | Needs pairing? |
   |---|---|---|
-  | **Remote** | Power On, Power Off, Mute, Vol −/+, Ch −/+, D-pad + OK, Back, Home, Options, Display, Input, HDMI1–HDMI4, "Open on TV" for a URL | Only "Open on TV" |
-  | **Numbers & colors** | Keys 0–9 and Enter; Red, Green, Yellow, Blue in the order the TV reports (`system/getColorKeysLayout`, default RGYB) | No |
+  | **Remote** | Power On, Power Off, Mute, Vol −/+, Ch −/+, D-pad + OK, Input, HDMI1–HDMI4, ANT, "Open on TV" for a URL (Enter in the field also opens it) | Only "Open on TV" |
+  | **Numbers & colors** | Keys 0–9 (last row: Enter, 0, OK); Red, Green, Yellow, Blue in the order the TV reports (`system/getColorKeysLayout`, default RGYB) | No |
   | **Media** | Play, Pause, Stop, Rewind, Forward, Prev, Next | No |
-  | **Inputs** | List built from `avContent/getCurrentExternalInputsStatus` with the titles the TV reports and a ● when something is connected; Refresh button | Reading: no. Switching: yes (`setPlayContent`); unpaired, HDMI1–HDMI4 still work through their IRCC codes and the other inputs say "Not paired" |
-  | **More** | Guide, Subtitle, Audio, Wide, Exit, Picture off, Sync menu; exact volume slider; type text; Sync TV clock | Keys: no. Volume slider (set), type text, Sync TV clock: yes |
+  | **Inputs** | List built from `avContent/getCurrentExternalInputsStatus` with the titles the TV reports and a green dot when something is connected; Refresh button; refreshes itself every 3 s while the tab is open | Reading: no. Switching: yes (`setPlayContent`); unpaired, HDMI1–HDMI4 still work through their IRCC codes and the other inputs say "Not paired" |
+  | **More** | Guide, Subtitle, Audio, Wide, Exit, Picture off, Sync menu; exact volume slider (follows the remote control); "All TV keys" list; type text (Enter sends it); Sync TV clock | Keys and the list: no. Volume slider (set), type text, Sync TV clock: yes |
 
+- **Fixed navigation bar** (1.3.0): Back (`Return`), Home, Options and Display
+  sit in a row between the tabs and the status line, so they are there on every
+  tab (the TV asks for RETURN, OPTIONS and DISPLAY on screens such as screen
+  mirroring). The tooltips show the names printed on the original remote:
+  RETURN, HOME, OPTIONS, DISPLAY.
+- **ANT** (1.3.0): on the Remote tab, after HDMI3 and HDMI4. It sends the
+  `Analog` key, which switches the tuner between Antenna (digital) and Cable
+  (analog) on a Brazilian TV, like the ANT key of the original remote.
+- **All TV keys** (1.3.0): on the More tab, a drop-down with every key name the
+  TV publishes in `system/getRemoteControllerInfo` (the built-in table if the
+  TV does not answer), sorted without regard to case, and a Send button, so no
+  command of the remote is left out of the app.
+- **Enter in text fields** (1.3.0): Enter in the URL field opens the page; Enter
+  in the "Text to type on the TV" field sends the text.
+- **Inputs refresh itself** (1.3.0): while the Inputs tab is selected and the
+  window is not minimized, the app reads `getCurrentExternalInputsStatus` every
+  3 seconds, so the green dot follows devices turning on and off. This TV (2013)
+  cannot announce changes, so the app asks. The list is redrawn only when it
+  changed, and a failed automatic read shows nothing.
 - **Exact volume:** a slider from 0 to the TV's `maxVolume` with the current
   number beside it. The volume is read (no pairing) when the More tab opens and
-  after every Vol −, Vol + and Mute click. `setAudioVolume` is sent only when
-  the slider is **released**, not on every pixel. Unpaired, the slider is
-  read-only and the tab says "Not paired — click Pair with TV".
+  after every Vol −, Vol + and Mute click. Unpaired, the slider is read-only and
+  the tab says "Not paired — click Pair with TV".
+- **Live volume** (1.3.0): `setAudioVolume` is sent while you drag the bar and
+  on every arrow, PageUp, PageDown, Home and End key, at most once every 250 ms
+  and always with the latest value; on release the final value is sent if it
+  differs from the last one sent.
+- **Volume bar follows the remote control** (1.3.0): while the More tab is
+  selected and the window is not minimized, `getVolumeInformation` is read every
+  2 seconds and the bar and number are updated. No read happens while you hold
+  the bar, for 2 seconds after the app sent a volume, or while a read is still
+  running. A value that came from the TV is never sent back, and a failed
+  automatic read shows nothing.
 - **Type text:** the app asks `appControl/getApplicationStatusList` first. If
   `textInput` is `off` it shows "Open a text field on the TV first" and does
   **not** call `setTextForm`. If it is `on` (and the app is paired) it sends the
@@ -130,9 +159,11 @@ OS** (Linux included).
 - `setWolMode`: it can turn off Wake-on-LAN, which is the **only** way to power
   this TV on from standby. Without Wake-on-LAN it could only be turned on with
   the original remote.
-- The Japanese keys (BS, CS, Ddata, acTVila, Analog, Digital): they do nothing
-  on a Brazilian TV.
-- Netflix, InternetVideo and InternetWidgets: those services were shut down.
+- From the "All TV keys" list: the Japanese keys (BS, CS, BSCS, Ddata, acTVila,
+  RakurakuStart) because they do nothing on a Brazilian TV; Netflix,
+  InternetVideo and InternetWidgets because those services were shut down; and
+  DeleteVideo because it can delete a recording. (`Analog` is **not** excluded:
+  on a Brazilian TV it is the ANT key, which has its own button.)
 
 > **Reserve the TV's IP in your router** (DHCP reservation / static lease). The
 > app knows a TV only by its IP. If the TV gets a new IP, the app treats it as a
@@ -143,6 +174,14 @@ OS** (Linux included).
 The version number lives only in `<Version>` in
 [`app/TvRemote.csproj`](app/TvRemote.csproj); the window title and About
 window read it from the assembly.
+
+### Known limitations
+
+- The TV's built-in browser (2013) cannot open many modern HTTPS sites. It shows
+  "Secure connection: fatal error (40)" (TLS `handshake_failure`) when the server
+  accepts only TLS 1.2 AEAD ciphers (AES-GCM, ChaCha20). `http://` does not help
+  when the site redirects to https. Workaround: screen mirroring (Miracast;
+  Windows + K on a PC) or an HDMI streaming stick.
 
 ### Download or build
 
@@ -158,12 +197,9 @@ Get-FileHash .\SonyTvRemote.exe -Algorithm SHA256
 # expected for v1.2.0: AFC25D950278A8EEA17B74ABCB354B55020188C43159A22300A1AA3A36A1137B
 ```
 
-Testing status of v1.2.0: unit tests pass, and the new Scalar calls (exact
-volume, input switch, clock, text-input gate) were checked against the real
-KDL-42W805A over the API. The on-screen behavior of the new IRCC keys (numbers,
-colors, media, Guide, Subtitle, Audio, Wide, Exit, Picture off, Sync menu) has
-not been checked by someone in front of the TV yet. Fixes, if any, will ship as
-v1.2.1.
+Testing status of v1.2.0: v1.2.0 was checked in front of a KDL-42W805A on
+2026-10-28; the fixes and requests from that test are in 1.3.0, which is being
+tested before release.
 
 To build it:
 
@@ -183,7 +219,8 @@ on first run (More info → Run anyway).
 
 Unit tests (version, translations, Wake-on-LAN packet, URL handling, IRCC code
 parsing and the built-in table, cookie handling, settings, power-on sequence,
-inputs list, volume limits, color-key order, TV clock format, text-input gate,
+inputs list and its comparison, volume limits and send limiter, automatic-read
+rules, all-keys list, color-key order, TV clock format, text-input gate,
 error classification, request formats):
 
 ```bash

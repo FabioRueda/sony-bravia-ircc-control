@@ -9,6 +9,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Controls.Shapes;
+using Avalonia.Styling;
+using Avalonia.Threading;
 
 namespace SonyTvRemote
 {
@@ -61,6 +64,23 @@ namespace SonyTvRemote
         private bool _volSending;
         private TextBox _textBox;
 
+        // More: the slider sends while it moves (at most every 250 ms) and follows the remote control.
+        private readonly Stopwatch _clock = Stopwatch.StartNew();
+        private readonly VolumeThrottle _volThrottle = new VolumeThrottle(-1);
+        private bool _volHeld;            // mouse or key is holding the slider
+        private bool _volFromTv;          // the slider is being set from a TV reading: never send
+        private bool _volReleaseQueued;   // released while a send was running
+        private bool _volReading;
+        private TimeSpan? _volLastSendAt;
+        private bool _inputsReading;
+        private readonly DispatcherTimer _inputsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        private readonly DispatcherTimer _volReadTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        private readonly DispatcherTimer _volPumpTimer = new DispatcherTimer { Interval = VolumeThrottle.Interval };
+
+        // More: every key the TV publishes.
+        private ComboBox _allKeysBox;
+        private string _allKeysSig = "";
+
         public MainWindow()
         {
             _settings = Settings.Load(_settingsPath);
@@ -68,7 +88,7 @@ namespace SonyTvRemote
             _tv = new TvClient(_settings, _settingsPath);
 
             Width = 410;
-            Height = 740;
+            Height = 780;
             CanResize = false;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
@@ -122,13 +142,6 @@ namespace SonyTvRemote
             Place(grid, DBtn("▼", "Down"), 1, 2);
             remote.Children.Add(grid);
 
-            // --- Navigation ---
-            remote.Children.Add(Row(
-                Key("Back", "Return"),
-                Key("Home", "Home"),
-                Key("Options", "Options"),
-                Key("Display", "Display")));
-
             // --- Inputs (HDMI codes are not in the TV's list; standard BRAVIA codes) ---
             remote.Children.Add(Row(
                 Key("Input", "Input"),
@@ -136,10 +149,12 @@ namespace SonyTvRemote
                 Btn("Hdmi2", () => Ircc(IrccCodes.Hdmi2))));
             remote.Children.Add(Row(
                 Btn("Hdmi3", () => Ircc(IrccCodes.Hdmi3)),
-                Btn("Hdmi4", () => Ircc(IrccCodes.Hdmi4))));
+                Btn("Hdmi4", () => Ircc(IrccCodes.Hdmi4)),
+                Tip(Key("Ant", "Analog"), "AntTip")));
 
             // --- Open a page on the TV (needs pairing) ---
             _urlBox = new TextBox { Width = 230 };
+            OnEnter(_urlBox, OpenPage);
             _relabel.Add(() => _urlBox.Watermark = Strings.Get("UrlHint"));
             var openBtn = new Button { Width = 130, HorizontalContentAlignment = HorizontalAlignment.Center };
             Label(openBtn, "OpenOnTv");
@@ -148,6 +163,7 @@ namespace SonyTvRemote
 
             // --- Tabs: Remote | Numbers & colors | Media | Inputs | More ---
             // No theme padding: the widest rows (4 buttons of 88 px) need the full 382 px.
+            StyleTabs();
             _tabs = new TabControl { Padding = new Thickness(0) };
             _tabs.Items.Add(Tab("TabRemote", remote));
             _tabs.Items.Add(Tab("TabNumbers", BuildNumbersPage()));
@@ -159,6 +175,14 @@ namespace SonyTvRemote
                 if (e.Source == _tabs) await Safe(OnTabChanged);
             };
 
+            // --- Fixed navigation bar: the TV asks for RETURN, OPTIONS and DISPLAY on any screen ---
+            var nav = Row(
+                Tip(Key("Back", "Return"), "TipReturn"),
+                Tip(Key("Home", "Home"), "TipHome"),
+                Tip(Key("Options", "Options"), "TipOptions"),
+                Tip(Key("Display", "Display"), "TipDisplay"));
+            nav.Margin = new Thickness(0, 8, 0, 0);
+
             // --- Status ---
             _status = new TextBlock
             {
@@ -167,23 +191,95 @@ namespace SonyTvRemote
                 Margin = new Thickness(0, 8, 0, 0)
             };
 
-            var root = new Grid { Margin = new Thickness(14), RowDefinitions = new RowDefinitions("Auto,*,Auto") };
+            var root = new Grid { Margin = new Thickness(14), RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto") };
             Place(root, top, 0, 0);
             Place(root, _tabs, 0, 1);
-            Place(root, _status, 0, 2);
+            Place(root, nav, 0, 2);
+            Place(root, _status, 0, 3);
 
             Content = root;
             Closing += (s, e) => SaveSettings();
+
+            _inputsTimer.Tick += async (s, e) => await Safe(() => RefreshInputs(true, true));
+            _volReadTimer.Tick += async (s, e) => await Safe(AutoReadVolume);
+            _volPumpTimer.Tick += async (s, e) => await Safe(FlushVolume);
             ApplyLanguage();
+        }
+
+        // Reads on their own run only with the right tab open and the window not minimized.
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+            if (change.Property == WindowStateProperty) UpdateTimers();
+        }
+
+        private void UpdateTimers()
+        {
+            bool shown = WindowState != WindowState.Minimized;
+            SetTimer(_inputsTimer, shown && _tabs != null && _tabs.SelectedIndex == 3);
+            SetTimer(_volReadTimer, shown && _tabs != null && _tabs.SelectedIndex == 4);
+        }
+
+        private static void SetTimer(DispatcherTimer timer, bool on)
+        {
+            if (on && !timer.IsEnabled) timer.Start();
+            else if (!on && timer.IsEnabled) timer.Stop();
+        }
+
+        // Enter in a text box does what the matching button does. Tunnel: the TextBox may handle Enter itself.
+        private void OnEnter(TextBox box, Func<Task> action)
+        {
+            box.AddHandler(InputElement.KeyDownEvent, async (s, e) =>
+            {
+                if (e.Key != Avalonia.Input.Key.Enter) return;
+                e.Handled = true;
+                await Safe(action);
+            }, RoutingStrategies.Tunnel);
+        }
+
+        // Tooltip text from the dictionary, re-applied when the language changes.
+        private Button Tip(Button b, string key)
+        {
+            _relabel.Add(() => ToolTip.SetTip(b, Strings.Get(key)));
+            return b;
         }
 
         // ---------- tabs ----------
 
         private TabItem Tab(string key, Control content)
         {
-            var item = new TabItem { FontSize = 12, Padding = new Thickness(8, 4), Content = content };
+            var item = new TabItem { Padding = new Thickness(6, 4), Content = content };
             _relabel.Add(() => item.Header = Strings.Get(key));
             return item;
+        }
+
+        // Tab headers that look like tabs: dark 14 pt text on a bordered light fill (at least 4.5:1),
+        // and a bold, highlighted selected tab.
+        private void StyleTabs()
+        {
+            Styles.Add(new Style(x => x.OfType<TabItem>())
+            {
+                Setters =
+                {
+                    new Setter(TemplatedControl.FontSizeProperty, 14.0),
+                    new Setter(TemplatedControl.ForegroundProperty, new SolidColorBrush(Color.Parse("#1A1A1A"))),
+                    new Setter(TemplatedControl.BackgroundProperty, new SolidColorBrush(Color.Parse("#E6E6E6"))),
+                    new Setter(TemplatedControl.BorderBrushProperty, new SolidColorBrush(Color.Parse("#707070"))),
+                    new Setter(TemplatedControl.BorderThicknessProperty, new Thickness(1)),
+                    new Setter(Layoutable.MarginProperty, new Thickness(0, 0, 2, 2)),
+                }
+            });
+            Styles.Add(new Style(x => x.OfType<TabItem>().Class(":selected"))
+            {
+                Setters =
+                {
+                    new Setter(TemplatedControl.ForegroundProperty, new SolidColorBrush(Color.Parse("#0A1F44"))),
+                    new Setter(TemplatedControl.BackgroundProperty, new SolidColorBrush(Color.Parse("#9CC8FF"))),
+                    new Setter(TemplatedControl.BorderBrushProperty, new SolidColorBrush(Color.Parse("#1F5FBF"))),
+                    new Setter(TemplatedControl.BorderThicknessProperty, new Thickness(2)),
+                    new Setter(TemplatedControl.FontWeightProperty, FontWeight.Bold),
+                }
+            });
         }
 
         private static StackPanel Page() => new StackPanel { Spacing = 8, Margin = new Thickness(0, 10, 0, 0) };
@@ -204,8 +300,9 @@ namespace SonyTvRemote
                 RowDefinitions = new RowDefinitions("*,*,*,*")
             };
             for (int d = 1; d <= 9; d++) Place(pad, DBtn(d.ToString(), "Num" + d), (d - 1) % 3, (d - 1) / 3);
+            Place(pad, DBtn(null, "Enter"), 0, 3);
             Place(pad, DBtn("0", "Num0"), 1, 3);
-            Place(pad, DBtn(null, "Enter"), 2, 3);
+            Place(pad, DBtn(null, "Confirm"), 2, 3);
             page.Children.Add(pad);
 
             _colorRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, HorizontalAlignment = HorizontalAlignment.Center };
@@ -273,7 +370,17 @@ namespace SonyTvRemote
             {
                 var chosen = input;
                 var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                label.Children.Add(new TextBlock { Text = chosen.Connected ? "●" : "○", Foreground = chosen.Connected ? Brushes.ForestGreen : Brushes.Gray });
+                // Same fixed-width area on every row, so every name starts at the same place.
+                var dot = new Ellipse
+                {
+                    Width = 10,
+                    Height = 10,
+                    Fill = chosen.Connected ? Brushes.ForestGreen : null,
+                    Stroke = chosen.Connected ? Brushes.ForestGreen : Brushes.Gray,
+                    StrokeThickness = 1.5,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                label.Children.Add(new Panel { Width = 14, Children = { dot } });
                 label.Children.Add(new TextBlock { Text = chosen.Title });
                 if (chosen.Connected)
                     label.Children.Add(new TextBlock { Text = "(" + Strings.Get("InputConnected") + ")", Foreground = Brushes.ForestGreen });
@@ -309,18 +416,30 @@ namespace SonyTvRemote
             _volNumber = new TextBlock { Width = 34, Text = "–", TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             _volSlider.PropertyChanged += (s, e) =>
             {
-                if (e.Property == RangeBase.ValueProperty) _volNumber.Text = ((int)Math.Round(_volSlider.Value)).ToString();
+                if (e.Property != RangeBase.ValueProperty) return;
+                _volNumber.Text = ((int)Math.Round(_volSlider.Value)).ToString();
+                if (_volFromTv || !_volHeld) return;
+                _ = Safe(OfferVolume);
             };
-            _volSlider.AddHandler(Thumb.DragCompletedEvent, async (s, e) => await Safe(CommitVolume), RoutingStrategies.Bubble, true);
-            _volSlider.AddHandler(InputElement.PointerReleasedEvent, async (s, e) => await Safe(CommitVolume), RoutingStrategies.Bubble, true);
-            _volSlider.KeyUp += async (s, e) => await Safe(CommitVolume);
+            // Tunnel: the slider's own handling of the click or the key comes after these.
+            _volSlider.AddHandler(InputElement.PointerPressedEvent, (s, e) => _volHeld = true, RoutingStrategies.Tunnel, true);
+            _volSlider.AddHandler(InputElement.PointerReleasedEvent, async (s, e) => await Safe(ReleaseVolume), RoutingStrategies.Bubble, true);
+            _volSlider.AddHandler(InputElement.PointerCaptureLostEvent, async (s, e) => await Safe(ReleaseVolume), RoutingStrategies.Bubble, true);
+            _volSlider.AddHandler(InputElement.KeyDownEvent, (s, e) => { if (IsVolumeKey(e.Key)) _volHeld = true; }, RoutingStrategies.Tunnel, true);
+            _volSlider.AddHandler(InputElement.KeyUpEvent, async (s, e) => { if (IsVolumeKey(e.Key)) await Safe(ReleaseVolume); }, RoutingStrategies.Bubble, true);
             _volNote = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap };
             _relabel.Add(ShowVolumeNote);
             page.Children.Add(Row(Text("VolumeExact"), _volSlider, _volNumber));
             page.Children.Add(_volNote);
 
+            // --- Every key the TV publishes ---
+            _allKeysBox = new ComboBox { Width = 170 };
+            _allKeysBox.ItemsSource = AllKeys.Build(null);
+            page.Children.Add(Row(Text("AllKeysLabel"), _allKeysBox, Btn("SendKey", SendSelectedKey, 70)));
+
             // --- Type text (needs pairing) ---
             _textBox = new TextBox { Width = 232 };
+            OnEnter(_textBox, SendText);
             _relabel.Add(() => _textBox.Watermark = Strings.Get("TextHint"));
             page.Children.Add(Row(_textBox, Btn("SendText", SendText, 118)));
 
@@ -612,11 +731,15 @@ namespace SonyTvRemote
 
         private async Task OnTabChanged()
         {
+            UpdateTimers();
             switch (_tabs.SelectedIndex)
             {
                 case 1: await LoadColorLayout(); break;
                 case 3: await RefreshInputs(true); break;
-                case 4: await RefreshVolume(true); break;
+                case 4:
+                    await RefreshVolume(true);
+                    await LoadAllKeys();
+                    break;
             }
         }
 
@@ -649,8 +772,11 @@ namespace SonyTvRemote
             RebuildColors();
         }
 
-        private async Task RefreshInputs(bool quiet)
+        // quiet: no IP messages. auto: the automatic 3 s refresh: no status line on failure, and
+        // the list is redrawn only when it changed.
+        private async Task RefreshInputs(bool quiet, bool auto = false)
         {
+            if (auto && !AutoRead.InputsAllowed(_inputsReading)) return;
             if (quiet ? !UseIpQuiet() : !UseIp()) return;
             var ip = _tv.Ip;
             if (_inputsIp != ip)
@@ -659,10 +785,24 @@ namespace SonyTvRemote
                 _inputs = new List<TvInput>();
                 RenderInputs();
             }
-            var r = await _tv.GetInputs();
-            if (_tv.Ip != ip) return;
-            if (r.Ok) { _inputs = InputList.Parse(r.Body); RenderInputs(); }
-            else ShowOutcome(r, null);
+            _inputsReading = true;
+            try
+            {
+                var r = await _tv.GetInputs();
+                if (_tv.Ip != ip) return;
+                if (r.Ok)
+                {
+                    var fresh = InputList.Parse(r.Body);
+                    if (auto && InputList.SameList(_inputs, fresh)) return;
+                    _inputs = fresh;
+                    RenderInputs();
+                }
+                else if (!auto) ShowOutcome(r, null);
+            }
+            finally
+            {
+                _inputsReading = false;
+            }
         }
 
         // Paired: switch with setPlayContent. Unpaired: only HDMI1-HDMI4 can, with the IRCC codes.
@@ -686,57 +826,142 @@ namespace SonyTvRemote
         {
             if (!UseIpQuiet()) return;
             var ip = _tv.Ip;
-            var r = await _tv.GetVolume();
-            if (_tv.Ip != ip) return;
-            ApplyVolume(r.Ok ? VolumeInfo.Parse(r.Body) : null);
-            if (report && !r.Ok) ShowOutcome(r, null);
+            _volReading = true;
+            try
+            {
+                var r = await _tv.GetVolume();
+                if (_tv.Ip != ip) return;
+                ApplyVolume(r.Ok ? VolumeInfo.Parse(r.Body) : null);
+                if (report && !r.Ok) ShowOutcome(r, null);
+            }
+            finally
+            {
+                _volReading = false;
+            }
+        }
+
+        // Every 2 s while the More tab is open: follows the remote control. Silent on failure.
+        private async Task AutoReadVolume()
+        {
+            TimeSpan? since = _volLastSendAt == null ? (TimeSpan?)null : _clock.Elapsed - _volLastSendAt.Value;
+            if (!AutoRead.VolumeAllowed(_volHeld, since, _volReading || _volSending)) return;
+            if (!UseIpQuiet()) return;
+            var ip = _tv.Ip;
+            _volReading = true;
+            try
+            {
+                var r = await _tv.GetVolume();
+                if (_tv.Ip != ip || !r.Ok) return;
+                var info = VolumeInfo.Parse(r.Body);
+                // Held or sent to while the reply was on its way: this reading is already old.
+                if (info == null || _volHeld || _volSending || _volThrottle.HasPending) return;
+                if (_volLastSendAt != null && _clock.Elapsed - _volLastSendAt.Value < AutoRead.VolumeQuietAfterSend) return;
+                ApplyVolume(info);
+            }
+            finally
+            {
+                _volReading = false;
+            }
         }
 
         private void ApplyVolume(VolumeInfo info)
         {
             bool paired = _tv.IsPaired;
             _volReadOnly = !paired;
-            if (info == null)
+            _volFromTv = true;   // a value that came from the TV is never sent back
+            try
             {
-                _volSlider.IsEnabled = false;
-                _volNumber.Text = "–";
-                _volApplied = -1;
+                if (info == null)
+                {
+                    _volSlider.IsEnabled = false;
+                    _volNumber.Text = "–";
+                    _volApplied = -1;
+                }
+                else
+                {
+                    _volSlider.Maximum = info.Max;
+                    _volSlider.Value = info.Volume;
+                    _volNumber.Text = info.Volume.ToString();
+                    _volApplied = info.Volume;
+                    _volSlider.IsEnabled = paired;
+                }
             }
-            else
+            finally
             {
-                _volSlider.Maximum = info.Max;
-                _volSlider.Value = info.Volume;
-                _volNumber.Text = info.Volume.ToString();
-                _volApplied = info.Volume;
-                _volSlider.IsEnabled = paired;
+                _volFromTv = false;
             }
+            _volThrottle.Reset(_volApplied);
             ShowVolumeNote();
         }
 
         private void ShowVolumeNote() => _volNote.Text = _volReadOnly ? Strings.Get("NotPaired") : "";
 
-        // Called when the slider is released (mouse, thumb or keyboard). Sends only a changed value.
-        private async Task CommitVolume()
+        private static bool IsVolumeKey(Avalonia.Input.Key k) =>
+            k == Avalonia.Input.Key.Left || k == Avalonia.Input.Key.Right || k == Avalonia.Input.Key.Up || k == Avalonia.Input.Key.Down
+            || k == Avalonia.Input.Key.PageUp || k == Avalonia.Input.Key.PageDown || k == Avalonia.Input.Key.Home || k == Avalonia.Input.Key.End;
+
+        private int SliderVolume() => VolumeInfo.Clamp((int)Math.Round(_volSlider.Value), (int)_volSlider.Maximum);
+
+        // The slider moved while held: send now if 250 ms have passed, else the pump timer sends it.
+        private async Task OfferVolume()
         {
-            if (_volSending || !_volSlider.IsEnabled) return;
+            if (!_volSlider.IsEnabled) return;
+            var v = _volThrottle.Offer(SliderVolume(), _clock.Elapsed);
+            if (v != null) await SendVolume(v.Value);
+            if (_volThrottle.HasPending) SetTimer(_volPumpTimer, true);
+        }
+
+        // Timer tick while the slider is held: the waiting value, once 250 ms have passed.
+        private async Task FlushVolume()
+        {
+            var v = _volThrottle.Take(_clock.Elapsed);
+            if (v != null) await SendVolume(v.Value);
+            if (!_volThrottle.HasPending) SetTimer(_volPumpTimer, false);
+        }
+
+        // Mouse, thumb or key released: send the final value if it is not the last one sent.
+        private async Task ReleaseVolume()
+        {
+            if (!_volHeld) return;
+            _volHeld = false;
+            SetTimer(_volPumpTimer, false);
+            if (!_volSlider.IsEnabled) return;
+            if (_volSending) { _volReleaseQueued = true; return; }
+            var v = _volThrottle.Release(SliderVolume(), _clock.Elapsed);
+            if (v != null) await SendVolume(v.Value);
+        }
+
+        // One send at a time. When it ends, a release that came in meanwhile is handled.
+        private async Task SendVolume(int volume)
+        {
+            if (_volSending)
+            {
+                // Should not happen (the throttle spaces sends), but never lose the value.
+                _volReleaseQueued = true;
+                return;
+            }
             _volSending = true;
+            bool failed = false;
             try
             {
-                // If the slider moved again while a value was being sent, send the new one too.
-                for (int attempt = 0; attempt < 3; attempt++)
-                {
-                    int volume = VolumeInfo.Clamp((int)Math.Round(_volSlider.Value), (int)_volSlider.Maximum);
-                    if (volume == _volApplied) return;
-                    if (!UseIp()) return;
-                    await _tv.RenewIfNeeded();
-                    if (!_tv.IsPaired) { SetStatus("NotPaired", true); await RefreshVolume(); return; }
-                    if (!ShowOutcome(await _tv.SetVolume(volume), "VolumeSet", volume)) { await RefreshVolume(); return; }
-                    _volApplied = volume;
-                }
+                if (!UseIp()) { failed = true; return; }
+                await _tv.RenewIfNeeded();
+                if (!_tv.IsPaired) { SetStatus("NotPaired", true); failed = true; return; }
+                _volLastSendAt = _clock.Elapsed;
+                if (!ShowOutcome(await _tv.SetVolume(volume), "VolumeSet", volume)) { failed = true; return; }
+                _volLastSendAt = _clock.Elapsed;
+                _volApplied = volume;
             }
             finally
             {
                 _volSending = false;
+            }
+            if (failed) { await RefreshVolume(); return; }
+            if (_volReleaseQueued)
+            {
+                _volReleaseQueued = false;
+                var last = _volThrottle.Release(SliderVolume(), _clock.Elapsed);
+                if (last != null) await SendVolume(last.Value);
             }
         }
 
@@ -753,6 +978,26 @@ namespace SonyTvRemote
                 case TextInputKind.Called: ShowOutcome(result.Reply, "TextSent"); break;
                 default: ShowOutcome(result.Reply, null); break;
             }
+        }
+
+        // Fills "All TV keys" with the TV's own names (built-in table when the TV gave none).
+        private async Task LoadAllKeys()
+        {
+            if (UseIpQuiet()) await LoadTvInfo();
+            var names = AllKeys.Build(_codes?.Keys);
+            var sig = string.Join("|", names);
+            if (sig == _allKeysSig) return;
+            _allKeysSig = sig;
+            var chosen = _allKeysBox.SelectedItem as string;
+            _allKeysBox.ItemsSource = names;
+            if (chosen != null && names.Contains(chosen)) _allKeysBox.SelectedItem = chosen;
+        }
+
+        private async Task SendSelectedKey()
+        {
+            var name = _allKeysBox.SelectedItem as string;
+            if (name == null) return;
+            await SendNamed(name);
         }
 
         private async Task SyncClock()
