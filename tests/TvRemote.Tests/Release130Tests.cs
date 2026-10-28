@@ -213,6 +213,7 @@ namespace SonyTvRemote.Tests
         [InlineData("TipDisplay")]
         [InlineData("AllKeysLabel")]
         [InlineData("SendKey")]
+        [InlineData("ChooseKey")]
         public void New_strings_exist_in_both_languages(string key)
         {
             Assert.True(Strings.Table(Lang.EnUs).ContainsKey(key), key);
@@ -230,6 +231,8 @@ namespace SonyTvRemote.Tests
             Assert.Equal("Todas as teclas da TV:", Strings.Get(Lang.PtBr, "AllKeysLabel"));
             Assert.Equal("Send", Strings.Get(Lang.EnUs, "SendKey"));
             Assert.Equal("Enviar", Strings.Get(Lang.PtBr, "SendKey"));
+            Assert.Equal("Choose a key", Strings.Get(Lang.EnUs, "ChooseKey"));
+            Assert.Equal("Escolha uma tecla", Strings.Get(Lang.PtBr, "ChooseKey"));
             foreach (var lang in new[] { Lang.EnUs, Lang.PtBr })
             {
                 Assert.Equal("RETURN", Strings.Get(lang, "TipReturn"));

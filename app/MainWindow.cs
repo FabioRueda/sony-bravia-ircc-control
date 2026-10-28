@@ -88,7 +88,7 @@ namespace SonyTvRemote
             _tv = new TvClient(_settings, _settingsPath);
 
             Width = 410;
-            Height = 780;
+            Height = 640;
             CanResize = false;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
@@ -435,6 +435,7 @@ namespace SonyTvRemote
             // --- Every key the TV publishes ---
             _allKeysBox = new ComboBox { Width = 170 };
             _allKeysBox.ItemsSource = AllKeys.Build(null);
+            _relabel.Add(() => _allKeysBox.PlaceholderText = Strings.Get("ChooseKey"));
             page.Children.Add(Row(Text("AllKeysLabel"), _allKeysBox, Btn("SendKey", SendSelectedKey, 70)));
 
             // --- Type text (needs pairing) ---

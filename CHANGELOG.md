@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tabs are easier to see: 14 pt dark text, a border on every header and a highlighted, bold selected tab.
 - Number pad: the last row is now Enter | 0 | OK. Enter sends `Enter`, as before. OK sends `Confirm`, which acts at once (on the KDL-42W805A, `Confirm` changed the channel immediately and `Enter` only after the wait time).
 - The Back, Home, Options and Display row moved from the Remote tab to the fixed bar.
-- The window is 780 px tall.
+- The window is 640 px tall, so it fits a 1280×800 screen with the taskbar.
 
 ### Fixed
 - The connected dot in the Inputs list was smaller than the empty one and pushed the name about 5 px to the left. Every row now has a fixed-width indicator, so all names start at the same place.

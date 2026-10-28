@@ -85,6 +85,7 @@ namespace SonyTvRemote
             ["TipOptions"] = "OPTIONS",
             ["TipDisplay"] = "DISPLAY",
             ["AllKeysLabel"] = "All TV keys:",
+            ["ChooseKey"] = "Choose a key",
             ["SendKey"] = "Send",
 
             ["Ready"] = "Ready. Set the TV IP and click.",
@@ -133,7 +134,7 @@ Changed
 • Tabs are easier to see: 14 pt text, a border on every tab and a highlighted, bold selected tab.
 • Number pad: the last row is now Enter | 0 | OK. Enter is sent as before; OK sends Confirm, which acts at once.
 • The Back, Home, Options and Display row moved from the Remote tab to the fixed bar.
-• The window is taller (780 px).
+• The window is 640 px tall and fits a 1280×800 screen.
 
 Fixed
 • The connected dot in the Inputs list no longer shifts the name to the left: every row uses an indicator of the same width.
@@ -268,6 +269,7 @@ Added
             ["TipOptions"] = "OPTIONS",
             ["TipDisplay"] = "DISPLAY",
             ["AllKeysLabel"] = "Todas as teclas da TV:",
+            ["ChooseKey"] = "Escolha uma tecla",
             ["SendKey"] = "Enviar",
 
             ["Ready"] = "Pronto. Confira o IP da TV e clique.",
@@ -316,7 +318,7 @@ Mudou
 • As abas ficaram mais visíveis: texto de 14, borda em cada aba e aba selecionada em destaque e em negrito.
 • Teclado numérico: a última linha agora é Enter | 0 | OK. O Enter é enviado como antes; o OK envia Confirm, que age na hora.
 • A linha Voltar, Início, Opções e Display saiu da aba Controle e foi para a barra fixa.
-• A janela ficou mais alta (780 px).
+• A janela tem 640 px de altura e cabe numa tela de 1280×800.
 
 Corrigido
 • A bolinha de entrada conectada não empurra mais o nome para a esquerda: todas as linhas usam um indicador do mesmo tamanho.
