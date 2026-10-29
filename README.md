@@ -290,8 +290,8 @@ Windows is in dark mode). All colors, fonts and corner radii live in
 | Success | `#1E7A46` | success messages, "connected" input |
 | Error | `#B42318` | error messages, volume warning |
 
-Fonts: **Poppins** SemiBold for titles, buttons and tabs (Bold for the selected
-tab) and **Roboto** Regular for everything else; Arial if a font cannot load.
+Fonts: **Poppins** SemiBold for titles, buttons and tabs (the selected tab too,
+so the tabs keep their width) and **Roboto** Regular for everything else; Arial if a font cannot load.
 Corners: fields and drop-downs 6 px, buttons 10 px, tabs 6 px. The four colored
 remote-control keys keep the colors of a real remote (red, green, yellow, blue);
 the green is darker so its white label is readable. The unit tests check the
@@ -304,7 +304,7 @@ The `.exe` embeds these fonts from [google/fonts](https://github.com/google/font
 under the SIL Open Font License 1.1. The license texts are in `app/Assets/Fonts/`
 (`Poppins-OFL.txt`, `Roboto-OFL.txt`).
 
-- Poppins SemiBold and Poppins Bold (`Poppins-SemiBold.ttf`, `Poppins-Bold.ttf`).
+- Poppins SemiBold (`Poppins-SemiBold.ttf`).
 - Roboto Regular. `Roboto-Variable.ttf` is the upstream variable file (kept in the
   repository, not embedded). `Roboto-Regular.ttf` is its weight 400, width 100
   instance, made with fontTools `varLib.instancer`; it is the file embedded in

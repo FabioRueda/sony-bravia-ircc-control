@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.5.0] - 2026-10-28
 
 ### Changed
-- New **navy and orange theme**. Navy (`#131B59`) is the main color: button text and border, tab text, the selected tab (solid navy, white bold text), the Fluent accent (volume bar, list selection) and the keyboard focus ring. Orange (`#FF9B00`) fills only the main button, Power on. Muted text and field borders use `#565D73`; success and error messages use `#1E7A46` and `#B42318`. Every pair of colors that carries text or a control border is checked against WCAG 2.x contrast in the tests.
-- **Poppins** (SemiBold for titles, buttons and tabs; Bold for the selected tab) and **Roboto** (everything else), embedded in the `.exe`. Poppins buttons use 13 pt, because the Portuguese "Apagar imagem" does not fit the 118 px key at 14 pt; that key is now 130 px wide. The "All TV keys" drop-down is 150 px (was 170 px) and the tab headers have 3 px side padding, so every row still fits in 382 px in both languages.
+- New **navy and orange theme**. Navy (`#131B59`) is the main color: button text and border, tab text, the selected tab (solid navy, white text), the Fluent accent (volume bar, list selection) and the keyboard focus ring. Orange (`#FF9B00`) fills only the main button, Power on. Muted text and field borders use `#565D73`; success and error messages use `#1E7A46` and `#B42318`. Every pair of colors that carries text or a control border is checked against WCAG 2.x contrast in the tests.
+- **Poppins** (SemiBold for titles, buttons and tabs, including the selected tab) and **Roboto** (everything else), embedded in the `.exe`. Poppins buttons use 13 pt, because the Portuguese "Apagar imagem" does not fit the 118 px key at 14 pt; that key is now 130 px wide. The "All TV keys" drop-down is 150 px (was 170 px) and the tab headers have 3 px side padding, so every row still fits in 382 px in both languages.
 - Light theme only, also when Windows uses dark mode.
 - The green color key is `#1E7A46` (was `ForestGreen`): white text on it is now 5.3:1, above the 4.5:1 minimum.
 

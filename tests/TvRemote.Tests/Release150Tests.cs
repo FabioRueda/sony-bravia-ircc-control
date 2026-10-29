@@ -1,7 +1,10 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
+using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Styling;
 using SonyTvRemote;
 using Xunit;
 
@@ -52,6 +55,7 @@ namespace SonyTvRemote.Tests
             { "Green key text", "KeyLightText", "KeyGreen" },
             { "Yellow key text", "KeyDarkText", "KeyYellow" },
             { "Blue key text", "KeyLightText", "KeyBlue" },
+            { "selected text", "White", "Navy" },
         };
 
         private static Color Token(string name)
@@ -80,6 +84,23 @@ namespace SonyTvRemote.Tests
             Assert.True(ratio >= 3.0, label + ": " + ratio.ToString("0.00") + ":1");
         }
 
+        // Selected text in the fields: Navy highlight with White text (the default kept Ink text on Navy, about 1:1).
+        [Fact]
+        public void The_text_box_style_sets_both_selection_colors()
+        {
+            var styles = new Styles();
+            AppTheme.AddStyles(styles);
+            var setters = styles.OfType<Style>()
+                .Where(s => s.Selector != null && s.Selector.ToString() == "TextBox")
+                .SelectMany(s => s.Setters.OfType<Setter>())
+                .ToList();
+
+            var highlight = setters.Single(x => x.Property == TextBox.SelectionBrushProperty).Value;
+            var text = setters.Single(x => x.Property == TextBox.SelectionForegroundBrushProperty).Value;
+            Assert.Equal(AppTheme.Navy, Assert.IsAssignableFrom<ISolidColorBrush>(highlight).Color);
+            Assert.Equal(AppTheme.White, Assert.IsAssignableFrom<ISolidColorBrush>(text).Color);
+        }
+
         [Fact]
         public void The_theme_values_are_the_specified_ones()
         {
@@ -106,7 +127,6 @@ namespace SonyTvRemote.Tests
         public static TheoryData<string, string> FontFiles() => new TheoryData<string, string>
         {
             { "Poppins-SemiBold.ttf", "d3bf1bdaf0550e83da9ac0b1d1d9fe6db086835a83aa28578e609a394b9a0286" },
-            { "Poppins-Bold.ttf", "983676516167748b74de6f4771fb384c664fd913acb8b471122ecacf5da5ea6c" },
             { "Roboto-Variable.ttf", "d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134" },
             { "Poppins-OFL.txt", "6be04893d770899a015649c7aa3b582f871b272f8747a92b78b17c3e5c8b2573" },
             { "Roboto-OFL.txt", "061402327a96aadb0bfb694a960ed289ecd38d383e396243831ab81feb109c41" },

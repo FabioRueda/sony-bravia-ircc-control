@@ -56,8 +56,8 @@ namespace SonyTvRemote
             => new SolidColorBrush(name == "Yellow" ? KeyDarkText : KeyLightText);
 
         // ---------- fonts ----------
-        // Poppins 600 / 700 for titles, buttons and tabs; Roboto 400 for the rest. Arial if they cannot load.
-        // The files are embedded in the .exe (app/Assets/Fonts). Both Poppins files report the family "Poppins".
+        // Poppins 600 for titles, buttons and tabs; Roboto 400 for the rest. Arial if they cannot load.
+        // The files are embedded in the .exe (app/Assets/Fonts). The Poppins file reports the family "Poppins".
         public const string FontBase = "avares://SonyTvRemote/Assets/Fonts";
         public static readonly FontFamily Poppins = FontFamily.Parse(FontBase + "#Poppins, Arial");
         public static readonly FontFamily Roboto = FontFamily.Parse(FontBase + "#Roboto, Arial");
@@ -171,7 +171,7 @@ namespace SonyTvRemote
         private static Selector Part<T>(Selector button, string pseudo, string part) where T : Control
             => button.Class(pseudo).Template().OfType<T>().Name(part);
 
-        private static void AddStyles(Styles s)
+        public static void AddStyles(Styles s)
         {
             // Windows (also the About, Find and PIN dialogs).
             s.Add(new Style(x => x.OfType<Window>())
@@ -219,7 +219,8 @@ namespace SonyTvRemote
                     }
                 });
 
-            // Tabs: Mist with a Muted border; the selected one is solid Navy with white bold text.
+            // Tabs: Mist with a Muted border; the selected one is solid Navy with white text. Every tab stays
+            // SemiBold: a Bold selected tab is wider, and the other tabs would shift when the selection changes.
             s.Add(new Style(x => x.OfType<TabItem>())
             {
                 Setters =
@@ -244,7 +245,6 @@ namespace SonyTvRemote
                     S(TabItem.BackgroundProperty, NavyBrush),
                     S(TabItem.BorderBrushProperty, NavyBrush),
                     S(TabItem.BorderThicknessProperty, new Thickness(2)),
-                    S(TabItem.FontWeightProperty, FontWeight.Bold),
                 }
             });
             s.Add(new Style(x => x.OfType<TabItem>().Class(":selected").Class(":pointerover"))
@@ -256,10 +256,16 @@ namespace SonyTvRemote
                 Setters = { S(Border.BackgroundProperty, NavyDarkBrush) }
             });
 
-            // Fields.
+            // Fields. Selected text is White on the Navy highlight (Ink on Navy would be nearly invisible).
             s.Add(new Style(x => x.OfType<TextBox>())
             {
-                Setters = { S(TextBox.CornerRadiusProperty, FieldRadius), S(TextBox.ForegroundProperty, InkBrush) }
+                Setters =
+                {
+                    S(TextBox.CornerRadiusProperty, FieldRadius),
+                    S(TextBox.ForegroundProperty, InkBrush),
+                    S(TextBox.SelectionBrushProperty, NavyBrush),
+                    S(TextBox.SelectionForegroundBrushProperty, WhiteBrush),
+                }
             });
             s.Add(new Style(x => x.OfType<ComboBox>())
             {

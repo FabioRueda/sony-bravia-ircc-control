@@ -71,7 +71,8 @@ namespace SonyTvRemote
             root.Children.Add(new ScrollViewer
             {
                 Margin = new Thickness(0, 6, 0, 0),
-                Content = new SelectableTextBlock { Text = Strings.Get("ChangelogText"), TextWrapping = TextWrapping.Wrap }
+                // 12 px on the right keeps the text off Fluent's thin scroll bar.
+                Content = new SelectableTextBlock { Text = Strings.Get("ChangelogText"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 12, 0) }
             });
 
             Content = root;

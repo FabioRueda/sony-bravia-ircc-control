@@ -23,7 +23,6 @@
          because Skia on Windows registers the variable file as its Thin instance (weight 100). Only the
          instance is embedded. -->
     <AvaloniaResource Include="Assets\Fonts\Poppins-SemiBold.ttf" />
-    <AvaloniaResource Include="Assets\Fonts\Poppins-Bold.ttf" />
     <AvaloniaResource Include="Assets\Fonts\Roboto-Regular.ttf" />
     <AvaloniaResource Include="Assets\Fonts\*.txt" />
   </ItemGroup>
