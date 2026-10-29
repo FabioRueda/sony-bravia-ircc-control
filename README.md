@@ -271,18 +271,21 @@ Published builds of `SonyTvRemote.exe` go on the
 [GitHub Releases](https://github.com/FabioRueda/sony-bravia-ircc-control/releases)
 page. The `.exe` is not committed (binaries don't belong in git).
 
-Latest: **[v1.3.0](https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.3.0)**.
+Latest: **[v1.4.0](https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.4.0)**.
 Check the download before running it (PowerShell):
 
 ```powershell
 Get-FileHash .\SonyTvRemote.exe -Algorithm SHA256
-# expected for v1.3.0: B6344F57E9FBDC19BD5EB19DC1A87DEF6FC0B908AA1789040DB7FF79164B35C0
+# expected for v1.4.0: BA98C896B80982928653997062C4B923E8A4B7B23588576DE8B5EA3E88ED45B8
 ```
 
-Testing status: v1.3.0 was checked in front of a KDL-42W805A on 2026-10-28; all
-12 on-screen checks passed (tabs, fixed navigation bar, Enter in the text
-fields, Enter / 0 / OK, ANT, All TV keys, automatic inputs and volume refresh,
-live volume, media keys, power on and off).
+Testing status: v1.4.0 was checked in front of a KDL-42W805A on 2026-10-29; all 8
+on-screen checks passed (IP change found by MAC at startup with the pairing
+carried over, IP row in both languages, Find and Pair tooltips, Find TV dialog,
+Search again and Close, a paired call after the IP change, volume keys, power
+off and on). No Windows Firewall prompt appeared. Not checked on screen: the
+search after "No response" and after Power On (same search code, covered by
+unit tests).
 
 To build it:
 
