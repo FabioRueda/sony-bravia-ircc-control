@@ -19,7 +19,10 @@ namespace SonyTvRemote
             ["LangPtBr"] = "Português (Brasil)",
             ["About"] = "About",
             ["TvIp"] = "TV IP:",
-            ["Pair"] = "Pair with TV",
+            ["Find"] = "Find TV",
+            ["FindTip"] = "Find the TV on the network",
+            ["Pair"] = "Pair",
+            ["PairTip"] = "Pair with TV (a PIN appears on the TV)",
             ["PowerOn"] = "Power On",
             ["PowerOff"] = "Power Off",
             ["Mute"] = "Mute",
@@ -98,7 +101,7 @@ namespace SonyTvRemote
             ["NoResponse"] = "No response (TV off or off-network?).",
             ["Unexpected"] = "Unexpected error. Try again.",
             ["Busy"] = "Please wait…",
-            ["NotPaired"] = "Not paired — click Pair with TV",
+            ["NotPaired"] = "Not paired — click Pair",
             ["PageSent"] = "Page sent to the TV.",
             ["PairAsking"] = "Asking the TV for a PIN…",
             ["PairCancelled"] = "Pairing cancelled.",
@@ -112,6 +115,20 @@ namespace SonyTvRemote
             ["PowerOnOk"] = "On",
             ["PowerStillStandby"] = "Still in standby",
             ["PowerNoMac"] = "Still in standby. No Wake-on-LAN MAC saved for this IP yet: use any button once with the TV on.",
+            ["PowerOnMoved"] = "On. The TV changed IP: now {0}.",
+
+            ["FindTitle"] = "Find TV",
+            ["FindSearching"] = "Searching the network… (up to 10 s)",
+            ["FindPick"] = "Click your TV:",
+            ["FindNone"] = "No Sony TV found. Turn the TV on with the remote and search again. After a long standby the TV leaves the network.",
+            ["FindSaved"] = "(saved TV)",
+            ["FindCurrent"] = "(current IP)",
+            ["FindAgain"] = "Search again",
+            ["TvChosen"] = "TV selected: {0} ({1}).",
+            ["TvMoved"] = "The TV changed IP: now {0}. Its saved data moved with it.",
+            ["TvMovedRetry"] = "The TV changed IP: now {0}. Click again.",
+            ["Searching"] = "Searching the network for the TV…",
+            ["SearchingAfterNoResponse"] = "No response. Searching the network for the TV…",
 
             ["AboutTitle"] = "About",
             ["Version"] = "Version {0}",
@@ -119,7 +136,18 @@ namespace SonyTvRemote
             ["History"] = "Version history",
             ["Close"] = "Close",
             ["ChangelogText"] =
-@"1.3.0 — 2026-10-28
+@"1.4.0 — 2026-10-28
+
+Added
+• Find TV button next to the TV IP: searches the network (SSDP, then a scan of your private /24 on port 52323) and lists the Sony TVs it finds. Click yours to use it.
+• The app recognizes the TV by its MAC. When the TV gets a new IP, its saved MAC and pairing move to the new IP together.
+• Automatic search, without dialogs: when the app opens and the TV does not answer, after ""No response"" or an HTTP failure on a click (at most once every 30 s), and after Power On when the TV does not come up. It runs only for a TV whose MAC is saved.
+• Opening the app with the TV on renews the pairing (before, only the functions that need pairing did).
+
+Changed
+• The Pair with TV button is now Pair, so that Find TV fits on the IP row.
+
+1.3.0 — 2026-10-28
 
 Added
 • A fixed bar with Back, Home, Options and Display under the tabs, visible on every tab (tooltips: RETURN, HOME, OPTIONS, DISPLAY).
@@ -203,7 +231,10 @@ Added
             ["LangPtBr"] = "Português (Brasil)",
             ["About"] = "Sobre",
             ["TvIp"] = "IP da TV:",
-            ["Pair"] = "Parear com a TV",
+            ["Find"] = "Procurar",
+            ["FindTip"] = "Procurar a TV na rede",
+            ["Pair"] = "Parear",
+            ["PairTip"] = "Parear com a TV (o PIN aparece na TV)",
             ["PowerOn"] = "Ligar",
             ["PowerOff"] = "Desligar",
             ["Mute"] = "Mudo",
@@ -282,7 +313,7 @@ Added
             ["NoResponse"] = "Sem resposta (TV desligada ou fora da rede?).",
             ["Unexpected"] = "Erro inesperado. Tente de novo.",
             ["Busy"] = "Aguarde…",
-            ["NotPaired"] = "Não pareado — clique em Parear com a TV",
+            ["NotPaired"] = "Não pareado — clique em Parear",
             ["PageSent"] = "Página enviada para a TV.",
             ["PairAsking"] = "Pedindo o PIN à TV…",
             ["PairCancelled"] = "Pareamento cancelado.",
@@ -296,6 +327,20 @@ Added
             ["PowerOnOk"] = "Ligada",
             ["PowerStillStandby"] = "Ainda em standby",
             ["PowerNoMac"] = "Ainda em standby. Ainda não há MAC do Wake-on-LAN salvo para este IP: use qualquer botão uma vez com a TV ligada.",
+            ["PowerOnMoved"] = "Ligada. A TV mudou de IP: agora {0}.",
+
+            ["FindTitle"] = "Procurar TV",
+            ["FindSearching"] = "Procurando na rede… (até 10 s)",
+            ["FindPick"] = "Clique na sua TV:",
+            ["FindNone"] = "Nenhuma TV Sony encontrada. Ligue a TV pelo controle remoto e procure de novo. Depois de muito tempo em standby, a TV sai da rede.",
+            ["FindSaved"] = "(TV salva)",
+            ["FindCurrent"] = "(IP atual)",
+            ["FindAgain"] = "Procurar de novo",
+            ["TvChosen"] = "TV escolhida: {0} ({1}).",
+            ["TvMoved"] = "A TV mudou de IP: agora {0}. Os dados salvos da TV foram junto.",
+            ["TvMovedRetry"] = "A TV mudou de IP: agora {0}. Clique de novo.",
+            ["Searching"] = "Procurando a TV na rede…",
+            ["SearchingAfterNoResponse"] = "Sem resposta. Procurando a TV na rede…",
 
             ["AboutTitle"] = "Sobre",
             ["Version"] = "Versão {0}",
@@ -303,7 +348,18 @@ Added
             ["History"] = "Histórico de versões",
             ["Close"] = "Fechar",
             ["ChangelogText"] =
-@"1.3.0 — 28/10/2026
+@"1.4.0 — 28/10/2026
+
+Novo
+• Botão Procurar ao lado do IP da TV: procura na rede (SSDP e, se for preciso, uma varredura da sua /24 privada na porta 52323) e lista as TVs Sony que achar. Clique na sua para usá-la.
+• O app reconhece a TV pelo MAC. Quando a TV recebe um IP novo, o MAC e o pareamento salvos vão juntos para o IP novo.
+• Procura automática, sem diálogos: ao abrir o app quando a TV não responde, depois de ""Sem resposta"" ou de falha HTTP num clique (no máximo 1 vez a cada 30 s) e depois de Ligar quando a TV não sobe. Só roda para uma TV com MAC salvo.
+• Abrir o app com a TV ligada renova o pareamento (antes, só as funções que exigem pareamento renovavam).
+
+Mudou
+• O botão Parear com a TV agora é Parear, para o Procurar caber na linha do IP.
+
+1.3.0 — 28/10/2026
 
 Novo
 • Barra fixa com Voltar, Início, Opções e Display abaixo das abas, visível em todas as abas (dicas: RETURN, HOME, OPTIONS, DISPLAY).

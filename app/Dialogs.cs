@@ -1,6 +1,9 @@
 using System;
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -74,6 +77,108 @@ namespace SonyTvRemote
         private static void OpenInBrowser(string url)
         {
             try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch (Exception) { }
+        }
+    }
+
+    // Searches the network when it opens and lists the Sony TVs it finds, one button each.
+    // Returns the TV clicked, or null. Closing the dialog cancels the search.
+    public class FindWindow : Window
+    {
+        private readonly Settings _settings;
+        private readonly string _currentIp;
+        private readonly TvClient _tv;
+        private readonly TextBlock _message;
+        private readonly StackPanel _list = new StackPanel { Spacing = 4 };
+        private readonly Button _again;
+        private CancellationTokenSource _cts;
+
+        public FindWindow(Settings settings, string currentIp, TvClient tv)
+        {
+            _settings = settings;
+            _currentIp = currentIp;
+            _tv = tv;
+
+            Title = Strings.Get("FindTitle");
+            Width = 380;
+            Height = 420;
+            CanResize = false;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            _message = new TextBlock { TextWrapping = TextWrapping.Wrap };
+            _again = new Button { Content = Strings.Get("FindAgain") };
+            _again.Click += async (s, e) => await Search();
+            var close = new Button { Content = Strings.Get("Close"), IsCancel = true };
+            close.Click += (s, e) => Close(null);
+
+            var footer = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+            footer.Children.Add(_again);
+            footer.Children.Add(close);
+
+            var root = new DockPanel { Margin = new Thickness(14) };
+            DockPanel.SetDock(_message, Dock.Top);
+            DockPanel.SetDock(footer, Dock.Bottom);
+            root.Children.Add(_message);
+            root.Children.Add(footer);
+            root.Children.Add(new ScrollViewer { Margin = new Thickness(0, 8, 0, 0), Content = _list });
+            Content = root;
+
+            Opened += async (s, e) => await Search();
+            Closing += (s, e) => _cts?.Cancel();
+        }
+
+        private async Task Search()
+        {
+            _cts?.Cancel();
+            var cts = _cts = new CancellationTokenSource();
+            _again.IsEnabled = false;
+            _list.Children.Clear();
+            _message.Text = Strings.Get("FindSearching");
+            try
+            {
+                var tvs = await Finder.FindAll(NetDiscovery.Parts(_tv), cts.Token);
+                if (cts != _cts) return;
+                Show(tvs);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception)
+            {
+                if (cts == _cts) Show(new List<FoundTv>());
+            }
+            if (cts == _cts) _again.IsEnabled = true;
+        }
+
+        private void Show(List<FoundTv> tvs)
+        {
+            _message.Text = Strings.Get(tvs.Count == 0 ? "FindNone" : "FindPick");
+            foreach (var tv in tvs)
+            {
+                var chosen = tv;
+                var first = chosen.Name + " — " + chosen.Ip;
+                if (chosen.Mac != null && _settings.FindIpByMac(chosen.Mac) != null) first += " " + Strings.Get("FindSaved");
+                if (string.Equals(chosen.Ip, _currentIp, StringComparison.OrdinalIgnoreCase)) first += " " + Strings.Get("FindCurrent");
+
+                var label = new StackPanel();
+                label.Children.Add(new TextBlock { Text = first, TextWrapping = TextWrapping.Wrap });
+                if (!string.IsNullOrEmpty(chosen.Model))
+                    label.Children.Add(new TextBlock { Text = chosen.Model, Foreground = Brushes.Gray });
+                var b = new Button
+                {
+                    Content = label,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Left
+                };
+                b.Click += (s, e) => Close(chosen);
+                _list.Children.Add(b);
+            }
         }
     }
 

@@ -58,15 +58,37 @@ namespace SonyTvRemote
         // and saves it for the current IP. Null when the TV doesn't answer or has none.
         public async Task<string> RefreshMac(TimeSpan timeout)
         {
+            MovedTo = null;
             var reply = await ScalarWithin(timeout, "system", "getSystemSupportedFunction", new object[0]);
-            var mac = ScalarReply.WolMac(reply.Body);
+            var mac = SonyTvRemote.Mac.Normalize(ScalarReply.WolMac(reply.Body));
             if (mac == null) return null;
-            if (mac != _settings.GetMac(reply.Ip))
+            bool changed = mac != SonyTvRemote.Mac.Normalize(_settings.GetMac(reply.Ip));
+            if (changed) _settings.SetMac(reply.Ip, mac);
+
+            // The same MAC saved under another IP is this TV from before its IP changed:
+            // its MAC and pairing move here.
+            var other = _settings.FindIpByMac(mac, reply.Ip);
+            if (other != null && _settings.MoveTv(other, reply.Ip))
             {
-                _settings.SetMac(reply.Ip, mac);
-                TrySave();
+                MovedTo = reply.Ip;
+                changed = true;
             }
+            if (changed) TrySave();
             return mac;
+        }
+
+        // Set by RefreshMac to the current IP when it moved the saved data of this TV here
+        // from another IP; null otherwise.
+        public string MovedTo { get; private set; }
+
+        // The Wake-on-LAN MAC of the TV at this IP (system/getSystemSupportedFunction, no pairing).
+        // Changes nothing: not the current IP and not the settings. Null when it doesn't answer.
+        public async Task<string> ReadMacAt(string ip, TimeSpan timeout, CancellationToken ct = default)
+        {
+            var json = Json("getSystemSupportedFunction", new object[0]);
+            var reply = await SendTo(ip, "system", timeout, req =>
+                req.Content = new StringContent(json, Encoding.UTF8, "application/json"), ct);
+            return reply.Status == 200 ? SonyTvRemote.Mac.Normalize(ScalarReply.WolMac(reply.Body)) : null;
         }
 
         public Task<TvReply> Ircc(string code)
@@ -194,16 +216,20 @@ namespace SonyTvRemote
                 ["params"] = parameters
             });
 
-        private async Task<TvReply> Send(string path, TimeSpan timeout, Action<HttpRequestMessage> fill)
+        // Taken before any await: replies are stored under the TV that was asked.
+        private Task<TvReply> Send(string path, TimeSpan timeout, Action<HttpRequestMessage> fill)
+            => SendTo(Ip, path, timeout, fill);
+
+        private async Task<TvReply> SendTo(string ip, string path, TimeSpan timeout, Action<HttpRequestMessage> fill,
+            CancellationToken ct = default)
         {
-            // Taken before any await: replies are stored under the TV that was asked.
-            var ip = Ip;
             if (!UrlHelper.IsValidHost(ip)) return new TvReply { Status = 0, Ip = ip };
             try
             {
                 using (var req = new HttpRequestMessage(HttpMethod.Post, "http://" + ip + "/sony/" + path))
-                using (var cts = new CancellationTokenSource(timeout))
+                using (var cts = CancellationTokenSource.CreateLinkedTokenSource(ct))
                 {
+                    cts.CancelAfter(timeout);
                     fill(req);
                     using (var resp = await _http.SendAsync(req, cts.Token))
                     {

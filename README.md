@@ -85,7 +85,7 @@ A clickable remote window under [`app/`](app/), built with
 OS** (Linux included).
 
 - **Tabs** (1.2.0, easier to see in 1.3.0). The language selector, About, the
-  TV IP / Pair row, the fixed navigation bar and the status line stay visible
+  TV IP / Find TV / Pair row, the fixed navigation bar and the status line stay visible
   on every tab:
 
   | Tab | What is on it | Needs pairing? |
@@ -118,7 +118,7 @@ OS** (Linux included).
 - **Exact volume:** a slider from 0 to the TV's `maxVolume` with the current
   number beside it. The volume is read (no pairing) when the More tab opens and
   after every Vol −, Vol + and Mute click. Unpaired, the slider is read-only and
-  the tab says "Not paired — click Pair with TV".
+  the tab says "Not paired — click Pair".
 - **Live volume** (1.3.0): `setAudioVolume` is sent while you drag the bar and
   on every arrow, PageUp, PageDown, Home and End key, at most once every 250 ms
   and always with the latest value; on release the final value is sent if it
@@ -148,9 +148,9 @@ OS** (Linux included).
   no `EPG`). If that call fails, it uses a built-in table of the official
   KDL-42W805A codes, which now also holds the 1.2.0 keys. HDMI1–HDMI4 are not
   in the TV's list and use the standard BRAVIA codes.
-- **Pair with TV:** see [Pairing](#pairing-pin). Needed for "Open on TV", the
+- **Pair:** see [Pairing](#pairing-pin). Needed for "Open on TV", the
   exact volume, switching inputs from the list, typing text and syncing the
-  clock. Unpaired, the app shows "Not paired — click Pair with TV".
+  clock. Unpaired, the app shows "Not paired — click Pair".
 - **Power On:** see [Power on with Wake-on-LAN](#power-on-with-wake-on-lan).
 - **Language selector:** English (US) (default) or Português (Brasil). The
   switch applies immediately to every text, including the status line and the
@@ -166,7 +166,62 @@ OS** (Linux included).
   keyed by its IP. Switching the IP switches to that TV's own data: Power On
   uses the MAC saved for that IP, and the cookie saved for that IP is the only
   one sent to it. A settings file from 1.1.0 is migrated automatically to the
-  saved IP.
+  saved IP. Since 1.4.0 the MAC also identifies the TV: when its IP changes, its
+  entry moves to the new IP (see [Finding the TV](#finding-the-tv-140)).
+
+### Finding the TV (1.4.0)
+
+The router does not reserve the TV's IP, so it can change. The app finds the TV
+again by its **MAC address** and carries its saved data to the new IP.
+
+- **Find TV button:** next to the IP box (the row is: TV IP | box | Find TV |
+  Pair). It opens a dialog that searches the network (up to 10 s) and shows one
+  button per Sony TV: "name — IP" and the model below. "(saved TV)" marks a TV
+  whose MAC is saved in the settings; "(current IP)" marks the IP in the box.
+  Click your TV to put its IP in the box. If its MAC was saved under another IP,
+  the saved MAC and pairing move to the IP you clicked.
+- **Automatic search, in silence** (no dialog, no new error message; the status
+  line shows only the progress and the result). It runs only for a TV whose MAC
+  is saved, never twice at once and never while the Find TV dialog is open:
+  1. **When the app opens.** It reads `system/getPowerStatus` at the saved IP.
+     If the TV answers, the pairing is renewed when it is due (before, only the
+     functions that need pairing did this) and the MAC is saved if missing. If
+     it does not answer, the app searches for the saved MAC.
+  2. **After "No response" or an HTTP failure on a click** (not on the automatic
+     reads of the Inputs and More tabs). At most one search every 30 s. If it
+     finds the TV at a new IP the status says "Click again": the key that failed
+     is never repeated on its own.
+  3. **After Power On** ends without "active". Wake-on-LAN goes out by MAC in
+     broadcast, so it does not depend on the IP; the TV may simply have come up
+     with a new one.
+- **The MAC is the identity of the TV.** When the app reads the MAC of the TV at
+  the current IP and the same MAC is saved under another IP, the entry moves:
+  MAC and pairing (the cookie and its expiry together, keeping the pairing that
+  expires later) go to the current IP and the old IP's entry is deleted, because
+  another device may get that address. At the new IP, whatever was saved there
+  with another MAC (or none) is replaced. The pairing cookie depends on the TV
+  and the client id, not on the IP, so it keeps working at the new address.
+- **What the app does on the network:**
+  1. SSDP `M-SEARCH` to `239.255.255.250:1900` (TTL 2, `MX: 1`) from every
+     private IPv4 address (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) of an up
+     Ethernet or Wi-Fi adapter that has an IPv4 gateway, once with
+     `ST: urn:schemas-sony-com:service:ScalarWebAPI:1` and once with
+     `ST: urn:schemas-sony-com:service:IRCC:1`, repeated after 1 s, with the
+     answers heard for 3 s. The socket uses a random local port, never 1900.
+     The answer's `LOCATION` is used only if it is `http://` and its host is
+     the device that answered; otherwise `http://<IP>:52323/dmr.xml`.
+  2. If no valid Sony TV answered: a TCP connection to port 52323 (500 ms each,
+     64 at a time) on every address of the PC's /24 (or of the smaller subnet,
+     for a mask longer than /24; nothing for /31 and /32), except the network
+     and broadcast addresses and the PC itself.
+  3. For each candidate: `GET dmr.xml` (1.5 s, at most 256 KB, DTD prohibited).
+     It is accepted only when the manufacturer contains "Sony" and the file has
+     `X_ScalarWebAPI_BaseURL` or the `urn:schemas-sony-com:service:IRCC:1`
+     service.
+  4. `system/getSystemSupportedFunction` (1.5 s, no pairing) gives the MAC of
+     each TV.
+  Nothing is written to the TV or to the settings during the search, and the
+  app creates no Firewall rule and opens no listening port.
 
 ### What the app deliberately does not include
 
@@ -199,6 +254,16 @@ window read it from the assembly.
   accepts only TLS 1.2 AEAD ciphers (AES-GCM, ChaCha20). `http://` does not help
   when the site redirects to https. Workaround: screen mirroring (Miracast;
   Windows + K on a PC) or an HDMI streaming stick.
+- After a long standby the TV leaves the network (ports 80 and 52323 closed).
+  The search finds it only after it is on again; Wake-on-LAN by MAC still turns
+  it on.
+- The search covers only the PC's private /24 (or a smaller subnet). A TV on
+  another subnet or VLAN is not found.
+- Windows may show a Firewall notice the first time the app searches (it sends
+  and receives UDP for SSDP). If SSDP is blocked, the scan of port 52323 still
+  works.
+- Use the search only on networks you administer or where you have permission
+  to scan.
 
 ### Download or build
 
@@ -283,7 +348,7 @@ dotnet test tests/TvRemote.Tests
 
 ## Pairing (PIN)
 
-Tested on the KDL-42W805A. The app's **Pair with TV** button does this:
+Tested on the KDL-42W805A. The app's **Pair** button does this:
 
 1. `POST http://<IP>/sony/accessControl`:
    ```json

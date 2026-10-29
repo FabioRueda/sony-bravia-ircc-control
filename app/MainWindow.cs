@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -42,6 +43,14 @@ namespace SonyTvRemote
         private DateTime _infoFailedUtc = DateTime.MinValue;
         private bool _powerBusy;
         private bool _pairBusy;
+
+        // Finding the TV when its IP changes. One search at a time, never with the Find dialog open.
+        private bool _searchBusy;
+        private bool _findOpen;
+        private TimeSpan? _lastNoResponseSearchAt;
+        private int _statusSeq;            // bumped on every status, to tell whether a click changed it
+        private string _movedNotice;       // the new IP, when RefreshMac moved this TV's saved data
+        private readonly CancellationTokenSource _closeCts = new CancellationTokenSource();
 
         private TabControl _tabs;
 
@@ -107,11 +116,15 @@ namespace SonyTvRemote
             top.Children.Add(Row(Text("LanguageLabel"), _langBox, aboutBtn));
 
             // --- TV IP + pairing ---
-            _ipBox = new TextBox { Text = _settings.Ip, Width = 150, Watermark = Settings.DefaultIp };
-            var pairBtn = new Button { Width = 140, HorizontalContentAlignment = HorizontalAlignment.Center };
+            // The row must stay within 382 px in both languages: label | 125 | 88 | 88.
+            _ipBox = new TextBox { Text = _settings.Ip, Width = 125, Watermark = Settings.DefaultIp };
+            var findBtn = new Button { Width = 88, HorizontalContentAlignment = HorizontalAlignment.Center };
+            Label(findBtn, "Find");
+            findBtn.Click += async (s, e) => await Safe(FindTv);
+            var pairBtn = new Button { Width = 88, HorizontalContentAlignment = HorizontalAlignment.Center };
             Label(pairBtn, "Pair");
-            pairBtn.Click += async (s, e) => await Safe(Pair);
-            top.Children.Add(Row(Text("TvIp"), _ipBox, pairBtn));
+            pairBtn.Click += async (s, e) => await Click(Pair);
+            top.Children.Add(Row(Text("TvIp"), _ipBox, Tip(findBtn, "FindTip"), Tip(pairBtn, "PairTip")));
 
             // --- Power ---
             remote.Children.Add(Row(
@@ -158,7 +171,7 @@ namespace SonyTvRemote
             _relabel.Add(() => _urlBox.Watermark = Strings.Get("UrlHint"));
             var openBtn = new Button { Width = 130, HorizontalContentAlignment = HorizontalAlignment.Center };
             Label(openBtn, "OpenOnTv");
-            openBtn.Click += async (s, e) => await Safe(OpenPage);
+            openBtn.Click += async (s, e) => await Click(OpenPage);
             remote.Children.Add(Row(_urlBox, openBtn));
 
             // --- Tabs: Remote | Numbers & colors | Media | Inputs | More ---
@@ -198,7 +211,12 @@ namespace SonyTvRemote
             Place(root, _status, 0, 3);
 
             Content = root;
-            Closing += (s, e) => SaveSettings();
+            Closing += (s, e) =>
+            {
+                _closeCts.Cancel();
+                SaveSettings();
+            };
+            Opened += async (s, e) => await Safe(SearchOnOpen);
 
             _inputsTimer.Tick += async (s, e) => await Safe(() => RefreshInputs(true, true));
             _volReadTimer.Tick += async (s, e) => await Safe(AutoReadVolume);
@@ -233,7 +251,7 @@ namespace SonyTvRemote
             {
                 if (e.Key != Avalonia.Input.Key.Enter) return;
                 e.Handled = true;
-                await Safe(action);
+                await Click(action);
             }, RoutingStrategies.Tunnel);
         }
 
@@ -333,7 +351,7 @@ namespace SonyTvRemote
                     Foreground = name == "Yellow" ? Brushes.Black : Brushes.White,
                     Content = Strings.Get(name)
                 };
-                b.Click += async (s, e) => await Safe(() => SendNamed(irccName));
+                b.Click += async (s, e) => await Click(() => SendNamed(irccName));
                 _colorRow.Children.Add(b);
             }
         }
@@ -482,7 +500,7 @@ namespace SonyTvRemote
         {
             var b = new Button { Width = width, HorizontalContentAlignment = HorizontalAlignment.Center };
             Label(b, key);
-            b.Click += async (s, e) => await Safe(action);
+            b.Click += async (s, e) => await Click(action);
             return b;
         }
 
@@ -503,7 +521,7 @@ namespace SonyTvRemote
                 FontSize = 15
             };
             if (glyph == null) Label(b, irccName);
-            b.Click += async (s, e) => await Safe(() => SendNamed(irccName));
+            b.Click += async (s, e) => await Click(() => SendNamed(irccName));
             return b;
         }
 
@@ -512,6 +530,22 @@ namespace SonyTvRemote
         {
             try { await action(); }
             catch (Exception) { SetStatus("Unexpected", true); }
+        }
+
+        // A click of the user. After "No response" or an HTTP failure it may search the network for the
+        // TV (at most once every 30 s); it never repeats the key that failed. A TV that moved is reported.
+        private async Task Click(Func<Task> action)
+        {
+            int seq = _statusSeq;
+            await Safe(action);
+            if (_statusSeq != seq && _statusError && (_statusKey == "NoResponse" || _statusKey == "HttpFailed"))
+                await Safe(SearchAfterNoResponse);
+            if (_movedNotice != null)
+            {
+                var ip = _movedNotice;
+                _movedNotice = null;
+                SetStatus("TvMoved", false, ip);
+            }
         }
 
         private static StackPanel Row(params Control[] items)
@@ -533,6 +567,7 @@ namespace SonyTvRemote
             _statusKey = key;
             _statusArgs = args;
             _statusError = error;
+            _statusSeq++;
             RenderStatus();
         }
 
@@ -588,6 +623,7 @@ namespace SonyTvRemote
                 if (r.Status == 0) return;
             }
             if (needMac && await _tv.RefreshMac(TvClient.QuickTimeout) == null) _infoFailedUtc = DateTime.UtcNow;
+            NoteMoved();
         }
 
         private async Task SendNamed(string irccName)
@@ -635,6 +671,7 @@ namespace SonyTvRemote
 
                 // The IP may have been changed while the PIN dialog was open: report the TV that paired.
                 await _tv.RefreshMac(TvClient.QuickTimeout);
+                NoteMoved();
                 var until = _settings.GetAuthExpiresUtc(pairedIp);
                 if (until != null) SetStatus("Paired", false, until.Value.ToLocalTime());
                 await RefreshVolume();   // the exact-volume slider unlocks once paired
@@ -656,7 +693,9 @@ namespace SonyTvRemote
 
                 // Wake-on-LAN goes out first with the MAC saved for this IP. Without one, ask this
                 // TV directly (no retry back-off; the KDL-42W805A still answers on port 80 in standby).
+                var ip = _tv.Ip;
                 var mac = _tv.Mac ?? await _tv.RefreshMac(TvClient.NormalTimeout);
+                NoteMoved();
 
                 var clock = Stopwatch.StartNew();
                 bool on = await PowerOnSequence.RunAsync(
@@ -674,7 +713,7 @@ namespace SonyTvRemote
                     elapsed: () => clock.Elapsed);
 
                 if (on) SetStatus("PowerOnOk", false);
-                else SetStatus(mac == null ? "PowerNoMac" : "PowerStillStandby", true);
+                else if (!await SearchAfterPowerOn(ip)) SetStatus(mac == null ? "PowerNoMac" : "PowerStillStandby", true);
             }
             finally
             {
@@ -699,6 +738,136 @@ namespace SonyTvRemote
             else if (r.Ok) SetStatus("PageSent", false);
             else if (ScalarReply.ErrorCode(r.Body) is int code) SetStatus("TvError", true, code);
             else SetStatus("HttpFailed", true, r.Status);
+        }
+
+        // ---------- finding the TV ----------
+
+        private void NoteMoved()
+        {
+            if (_tv.MovedTo != null) _movedNotice = _tv.MovedTo;
+        }
+
+        private static bool SameIp(string a, string b) => string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
+
+        // The Find button: a dialog lists the TVs; the one clicked goes into the IP box.
+        private async Task FindTv()
+        {
+            if (_searchBusy || _findOpen) { SetStatus("Busy", false); return; }
+            _findOpen = true;
+            FoundTv chosen;
+            try { chosen = await new FindWindow(_settings, Ip(), _tv).ShowDialog<FoundTv>(this); }
+            finally { _findOpen = false; }
+            if (chosen == null) return;
+
+            // The same TV saved under another IP: its MAC and pairing go to the IP that was chosen.
+            var saved = chosen.Mac == null ? null : _settings.FindIpByMac(chosen.Mac, chosen.Ip);
+            if (saved != null && _settings.MoveTv(saved, chosen.Ip))
+            {
+                UseFoundIp(chosen.Ip);
+                SetStatus("TvMoved", false, chosen.Ip);
+            }
+            else
+            {
+                if (chosen.Mac != null) _settings.SetMac(chosen.Ip, chosen.Mac);
+                UseFoundIp(chosen.Ip);
+                SetStatus("TvChosen", false, chosen.Name, chosen.Ip);
+            }
+            SaveSettings();
+        }
+
+        private void UseFoundIp(string ip)
+        {
+            _ipBox.Text = ip;
+            if (UrlHelper.IsValidHost(ip)) _tv.Ip = ip;
+        }
+
+        // Looks for the TV saved at this IP by its MAC. On another IP: its saved data moves there, the IP
+        // box changes and the new IP is returned. Null when not found, found at the same IP, or when
+        // the user changed the IP meanwhile (the answer is for another TV then).
+        private async Task<string> FindMoved(string ip)
+        {
+            var mac = _settings.GetMac(ip);
+            if (mac == null) return null;
+            _searchBusy = true;
+            try
+            {
+                var found = await Finder.FindByMac(NetDiscovery.Parts(_tv), mac, _closeCts.Token);
+                if (found == null || !SameIp(Ip(), ip) || SameIp(found, ip)) return null;
+                if (!_settings.MoveTv(ip, found)) return null;
+                UseFoundIp(found);
+                SaveSettings();
+                return found;
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            finally
+            {
+                _searchBusy = false;
+            }
+        }
+
+        // The message to put back when a silent search finds nothing; skipped when something else
+        // wrote a status meanwhile.
+        private Action SetSearchStatus(string key)
+        {
+            var prevKey = _statusKey;
+            var prevArgs = _statusArgs;
+            var prevError = _statusError;
+            SetStatus(key, false);
+            int seq = _statusSeq;
+            return () =>
+            {
+                if (_statusSeq == seq) SetStatus(prevKey, prevError, prevArgs);
+            };
+        }
+
+        // When the app opens. TV answers: renew the pairing quietly. No answer: look for it by MAC.
+        private async Task SearchOnOpen()
+        {
+            if (!UseIpQuiet()) return;
+            var ip = _tv.Ip;
+            var power = await _tv.QuickScalar("system", "getPowerStatus");
+            if (!SameIp(Ip(), ip)) return;
+            if (ScalarReply.PowerStatus(power.Body) != null)
+            {
+                await _tv.RenewIfNeeded();
+                if (_tv.Mac == null) await _tv.RefreshMac(TvClient.QuickTimeout);
+                return;
+            }
+            if (!AutoSearch.CanStart(_settings.GetMac(ip) != null, _searchBusy, _findOpen)) return;
+            var restore = SetSearchStatus("Searching");
+            var found = await FindMoved(ip);
+            if (found != null) SetStatus("TvMoved", false, found);
+            else restore();
+        }
+
+        // After a click ended with "No response" or an HTTP failure.
+        private async Task SearchAfterNoResponse()
+        {
+            var ip = _tv.Ip;
+            TimeSpan? since = _lastNoResponseSearchAt == null ? (TimeSpan?)null : _clock.Elapsed - _lastNoResponseSearchAt.Value;
+            if (!AutoSearch.AfterNoResponse(_settings.GetMac(ip) != null, _searchBusy, _findOpen, since)) return;
+            _lastNoResponseSearchAt = _clock.Elapsed;
+            var restore = SetSearchStatus("SearchingAfterNoResponse");
+            var found = await FindMoved(ip);
+            if (found != null) SetStatus("TvMovedRetry", false, found);
+            else restore();
+        }
+
+        // Power On ended without "active": the TV may have come up with another IP.
+        // True when it set the final status.
+        private async Task<bool> SearchAfterPowerOn(string ip)
+        {
+            if (!AutoSearch.CanStart(_settings.GetMac(ip) != null, _searchBusy, _findOpen)) return false;
+            SetStatus("Searching", false);
+            var found = await FindMoved(ip);
+            if (found == null) return false;
+            var power = await _tv.QuickScalar("system", "getPowerStatus");
+            if (ScalarReply.PowerStatus(power.Body) == "active") SetStatus("PowerOnMoved", false, found);
+            else SetStatus("PowerStillStandby", true);
+            return true;
         }
 
         // ---------- 1.2.0 actions ----------

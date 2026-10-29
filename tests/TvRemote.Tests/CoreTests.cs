@@ -54,8 +54,8 @@ namespace SonyTvRemote.Tests
         [Fact]
         public void Get_uses_the_requested_language_and_formats_arguments()
         {
-            Assert.Equal("Not paired — click Pair with TV", Strings.Get(Lang.EnUs, "NotPaired"));
-            Assert.Equal("Não pareado — clique em Parear com a TV", Strings.Get(Lang.PtBr, "NotPaired"));
+            Assert.Equal("Not paired — click Pair", Strings.Get(Lang.EnUs, "NotPaired"));
+            Assert.Equal("Não pareado — clique em Parear", Strings.Get(Lang.PtBr, "NotPaired"));
             Assert.Equal("Failed: HTTP 500", Strings.Get(Lang.EnUs, "HttpFailed", 500));
         }
 

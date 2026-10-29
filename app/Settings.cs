@@ -182,5 +182,64 @@ namespace SonyTvRemote
             tv.AuthCookieProtected = null;
             tv.AuthExpiresUtc = null;
         }
+
+        // ---------- a TV whose IP changed ----------
+
+        // The key (IP) of the TV with this MAC, compared after normalizing; null if none.
+        // exceptIp leaves one key out, to look for the same TV under another IP.
+        public string FindIpByMac(string mac, string exceptIp = null)
+        {
+            var wanted = Mac.Normalize(mac);
+            if (wanted == null) return null;
+            var except = exceptIp == null ? null : Key(exceptIp);
+            foreach (var kv in Tvs)
+                if (kv.Key != except && Mac.Normalize(kv.Value?.Mac) == wanted) return kv.Key;
+            return null;
+        }
+
+        // Moves what is saved for a TV (MAC and pairing) from its old IP to its new one.
+        // False, and nothing changes, when the IPs are the same or fromIp has no data.
+        // The caller saves the file.
+        public bool MoveTv(string fromIp, string toIp)
+        {
+            var from = Key(fromIp);
+            var to = Key(toIp);
+            if (from == to) return false;
+            var source = Find(from);
+            if (source == null) return false;
+
+            var target = Find(to);
+            bool sameTv = target != null && Mac.Normalize(target.Mac) != null
+                          && Mac.Normalize(target.Mac) == Mac.Normalize(source.Mac);
+            if (sameTv)
+            {
+                // Keep the pairing that expires later; the cookie and its expiry always travel together.
+                var targetExpires = target.AuthExpiresUtc ?? DateTime.MinValue;
+                var sourceExpires = source.AuthExpiresUtc ?? DateTime.MinValue;
+                if (sourceExpires > targetExpires)
+                {
+                    target.AuthCookieProtected = source.AuthCookieProtected;
+                    target.AuthExpiresUtc = source.AuthExpiresUtc;
+                    MoveMemoryCookie(from, to);
+                }
+            }
+            else
+            {
+                // Whatever answers at the new IP now is this TV: its old data is replaced.
+                Tvs[to] = source;
+                MoveMemoryCookie(from, to);
+            }
+
+            Tvs.Remove(from);
+            _memoryCookies.Remove(from);
+            Ip = (toIp ?? "").Trim();
+            return true;
+        }
+
+        private void MoveMemoryCookie(string from, string to)
+        {
+            if (_memoryCookies.TryGetValue(from, out var cookie)) _memoryCookies[to] = cookie;
+            else _memoryCookies.Remove(to);
+        }
     }
 }

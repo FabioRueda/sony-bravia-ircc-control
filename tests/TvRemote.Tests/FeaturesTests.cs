@@ -558,13 +558,13 @@ namespace SonyTvRemote.Tests
         }
 
         [Fact]
-        public void Changelog_describes_1_3_0_in_both_languages()
+        public void Changelog_describes_1_4_0_in_both_languages()
         {
             foreach (var lang in new[] { Lang.EnUs, Lang.PtBr })
             {
                 var text = Strings.Get(lang, "ChangelogText");
-                Assert.StartsWith("1.3.0 ", text);
-                Assert.Contains("1.2.0", text);
+                Assert.StartsWith("1.4.0 ", text);
+                Assert.Contains("1.3.0", text);
             }
         }
     }

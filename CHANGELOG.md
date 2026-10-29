@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-28
+
+### Added
+- **Find TV** button on the IP row. It opens a dialog that searches the network and lists every Sony TV it finds (name, IP, model). Click one to use it. A TV already saved by its MAC is marked "(saved TV)"; the IP in the box is marked "(current IP)".
+- Network search: SSDP `M-SEARCH` first (two searches, repeated after 1 s, answers heard for 3 s, from every private IPv4 address of an up Ethernet or Wi-Fi adapter with a gateway). If no valid Sony TV answers, a scan of the PC's private /24: a TCP connection to port 52323 on each address (500 ms each, 64 at a time). Each candidate's `dmr.xml` is read (1.5 s, at most 256 KB, DTD prohibited) and accepted only for a Sony device with the Scalar Web API or the IRCC service. Then the MAC of each TV is read from `system/getSystemSupportedFunction`. The whole search ends within 10 s.
+- The TV is recognized by its **MAC**. `Settings.FindIpByMac` and `Settings.MoveTv` carry the saved MAC and pairing (cookie and expiry together) from the old IP to the new one, and delete the old IP's entry. When the app reads the MAC of the TV at the current IP and the same MAC is saved under another IP, that data moves to the current IP.
+- Automatic search, silent (no dialog, no new error): when the app opens and `getPowerStatus` gets no answer; after "No response" or an HTTP failure on a click (at most one search every 30 s; the key that failed is not repeated); and after Power On ends without "active". It runs only for a TV whose MAC is saved, never twice at once and never while the Find dialog is open. When it finds the TV at a new IP it moves the saved data, changes the IP box and says so.
+- Opening the app with the TV on renews the pairing (before, only the functions that need pairing did), and saves the MAC if the IP has none.
+- `Mac.Normalize`: upper case, ":" separator. Every MAC comparison uses it.
+
+### Changed
+- The "Pair with TV" button is now **Pair** (tooltip: "Pair with TV (a PIN appears on the TV)"), so that Find TV fits on the IP row. The row is: label | IP box (125 px) | Find TV (88 px) | Pair (88 px).
+- "Not paired — click Pair with TV" is now "Not paired — click Pair".
+
 ## [1.3.0] - 2026-10-28
 
 ### Added
