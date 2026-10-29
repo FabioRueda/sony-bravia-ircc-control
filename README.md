@@ -317,21 +317,20 @@ Published builds of `SonyTvRemote.exe` go on the
 [GitHub Releases](https://github.com/FabioRueda/sony-bravia-ircc-control/releases)
 page. The `.exe` is not committed (binaries don't belong in git).
 
-Latest: **[v1.4.0](https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.4.0)**.
+Latest: **[v1.5.0](https://github.com/FabioRueda/sony-bravia-ircc-control/releases/tag/v1.5.0)**.
 Check the download before running it (PowerShell):
 
 ```powershell
 Get-FileHash .\SonyTvRemote.exe -Algorithm SHA256
-# expected for v1.4.0: BA98C896B80982928653997062C4B923E8A4B7B23588576DE8B5EA3E88ED45B8
+# expected for v1.5.0: 261ADD82BF1D5A2ABB2E00978FEC5FC1C028C4F20E51961EB388ED2736E3C791
 ```
 
-Testing status: v1.4.0 was checked in front of a KDL-42W805A on 2026-10-29; all 8
-on-screen checks passed (IP change found by MAC at startup with the pairing
-carried over, IP row in both languages, Find and Pair tooltips, Find TV dialog,
-Search again and Close, a paired call after the IP change, volume keys, power
-off and on). No Windows Firewall prompt appeared. Not checked on screen: the
-search after "No response" and after Power On (same search code, covered by
-unit tests).
+Testing status: v1.5.0 was checked on 2026-10-28. On screen, in both languages:
+every tab, the About and Find TV windows, hover, pressed and keyboard-focus
+states, text selection and the volume bar. In front of a KDL-42W805A: volume
+keys, mute, the volume bar following the TV's own remote, and power off and on
+(Power on is the orange button); all passed. The app's functions did not change
+from v1.4.0.
 
 To build it:
 
