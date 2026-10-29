@@ -24,6 +24,7 @@ namespace SonyTvRemote
         public override void Initialize()
         {
             Styles.Add(new FluentTheme());
+            AppTheme.Apply(this);
         }
 
         public override void OnFrameworkInitializationCompleted()

@@ -128,7 +128,7 @@ namespace SonyTvRemote
 
             // --- Power ---
             remote.Children.Add(Row(
-                Btn("PowerOn", PowerOn),
+                MainBtn(Btn("PowerOn", PowerOn)),
                 Key("PowerOff", "PowerOff"),
                 VolKey("Mute", "Mute")));
 
@@ -176,7 +176,6 @@ namespace SonyTvRemote
 
             // --- Tabs: Remote | Numbers & colors | Media | Inputs | More ---
             // No theme padding: the widest rows (4 buttons of 88 px) need the full 382 px.
-            StyleTabs();
             _tabs = new TabControl { Padding = new Thickness(0) };
             _tabs.Items.Add(Tab("TabRemote", remote));
             _tabs.Items.Add(Tab("TabNumbers", BuildNumbersPage()));
@@ -199,7 +198,7 @@ namespace SonyTvRemote
             // --- Status ---
             _status = new TextBlock
             {
-                Foreground = Brushes.Gray,
+                Foreground = AppTheme.MutedBrush,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 8, 0, 0)
             };
@@ -266,38 +265,10 @@ namespace SonyTvRemote
 
         private TabItem Tab(string key, Control content)
         {
-            var item = new TabItem { Padding = new Thickness(6, 4), Content = content };
+            // Narrow side padding: the five tabs, in Poppins, must fit the 382 px of the tab strip in both languages.
+            var item = new TabItem { Padding = new Thickness(3, 4), Content = content };
             _relabel.Add(() => item.Header = Strings.Get(key));
             return item;
-        }
-
-        // Tab headers that look like tabs: dark 14 pt text on a bordered light fill (at least 4.5:1),
-        // and a bold, highlighted selected tab.
-        private void StyleTabs()
-        {
-            Styles.Add(new Style(x => x.OfType<TabItem>())
-            {
-                Setters =
-                {
-                    new Setter(TemplatedControl.FontSizeProperty, 14.0),
-                    new Setter(TemplatedControl.ForegroundProperty, new SolidColorBrush(Color.Parse("#1A1A1A"))),
-                    new Setter(TemplatedControl.BackgroundProperty, new SolidColorBrush(Color.Parse("#E6E6E6"))),
-                    new Setter(TemplatedControl.BorderBrushProperty, new SolidColorBrush(Color.Parse("#707070"))),
-                    new Setter(TemplatedControl.BorderThicknessProperty, new Thickness(1)),
-                    new Setter(Layoutable.MarginProperty, new Thickness(0, 0, 2, 2)),
-                }
-            });
-            Styles.Add(new Style(x => x.OfType<TabItem>().Class(":selected"))
-            {
-                Setters =
-                {
-                    new Setter(TemplatedControl.ForegroundProperty, new SolidColorBrush(Color.Parse("#0A1F44"))),
-                    new Setter(TemplatedControl.BackgroundProperty, new SolidColorBrush(Color.Parse("#9CC8FF"))),
-                    new Setter(TemplatedControl.BorderBrushProperty, new SolidColorBrush(Color.Parse("#1F5FBF"))),
-                    new Setter(TemplatedControl.BorderThicknessProperty, new Thickness(2)),
-                    new Setter(TemplatedControl.FontWeightProperty, FontWeight.Bold),
-                }
-            });
         }
 
         private static StackPanel Page() => new StackPanel { Spacing = 8, Margin = new Thickness(0, 10, 0, 0) };
@@ -346,11 +317,11 @@ namespace SonyTvRemote
                     Tag = name,
                     Padding = new Thickness(4, 5),
                     HorizontalContentAlignment = HorizontalAlignment.Center,
-                    Background = name == "Red" ? Brushes.Firebrick : name == "Green" ? Brushes.ForestGreen
-                        : name == "Yellow" ? Brushes.Gold : Brushes.RoyalBlue,
-                    Foreground = name == "Yellow" ? Brushes.Black : Brushes.White,
+                    Background = AppTheme.KeyBrush(name),
+                    Foreground = AppTheme.KeyTextBrush(name),
                     Content = Strings.Get(name)
                 };
+                b.Classes.Add("colorkey");
                 b.Click += async (s, e) => await Click(() => SendNamed(irccName));
                 _colorRow.Children.Add(b);
             }
@@ -381,7 +352,7 @@ namespace SonyTvRemote
             _inputsPanel.Children.Clear();
             if (_inputs.Count == 0)
             {
-                _inputsPanel.Children.Add(new TextBlock { Text = Strings.Get("InputsEmpty"), Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap });
+                _inputsPanel.Children.Add(new TextBlock { Text = Strings.Get("InputsEmpty"), Foreground = AppTheme.MutedBrush, TextWrapping = TextWrapping.Wrap });
                 return;
             }
             foreach (var input in _inputs)
@@ -393,15 +364,15 @@ namespace SonyTvRemote
                 {
                     Width = 10,
                     Height = 10,
-                    Fill = chosen.Connected ? Brushes.ForestGreen : null,
-                    Stroke = chosen.Connected ? Brushes.ForestGreen : Brushes.Gray,
+                    Fill = chosen.Connected ? AppTheme.SuccessBrush : null,
+                    Stroke = chosen.Connected ? AppTheme.SuccessBrush : AppTheme.MutedBrush,
                     StrokeThickness = 1.5,
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 label.Children.Add(new Panel { Width = 14, Children = { dot } });
                 label.Children.Add(new TextBlock { Text = chosen.Title });
                 if (chosen.Connected)
-                    label.Children.Add(new TextBlock { Text = "(" + Strings.Get("InputConnected") + ")", Foreground = Brushes.ForestGreen });
+                    label.Children.Add(new TextBlock { Text = "(" + Strings.Get("InputConnected") + ")", Foreground = AppTheme.SuccessBrush });
                 var b = new Button
                 {
                     Content = label,
@@ -417,7 +388,7 @@ namespace SonyTvRemote
         {
             var page = Page();
             page.Children.Add(Row(Btn("Guide", GuideKey, 118), PageKey("Subtitle", "SubTitle"), PageKey("Audio", "Audio")));
-            page.Children.Add(Row(PageKey("Wide", "Wide"), PageKey("Exit", "Exit"), PageKey("PicOff", "PicOff")));
+            page.Children.Add(Row(PageKey("Wide", "Wide"), PageKey("Exit", "Exit"), Btn("PicOff", () => SendNamed("PicOff"), 130)));
             page.Children.Add(Row(PageKey("SyncMenu", "SyncMenu")));
 
             // --- Exact volume: read-only without pairing; set when the slider is released ---
@@ -445,13 +416,14 @@ namespace SonyTvRemote
             _volSlider.AddHandler(InputElement.PointerCaptureLostEvent, async (s, e) => await Safe(ReleaseVolume), RoutingStrategies.Bubble, true);
             _volSlider.AddHandler(InputElement.KeyDownEvent, (s, e) => { if (IsVolumeKey(e.Key)) _volHeld = true; }, RoutingStrategies.Tunnel, true);
             _volSlider.AddHandler(InputElement.KeyUpEvent, async (s, e) => { if (IsVolumeKey(e.Key)) await Safe(ReleaseVolume); }, RoutingStrategies.Bubble, true);
-            _volNote = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap };
+            _volNote = new TextBlock { Foreground = AppTheme.ErrorBrush, TextWrapping = TextWrapping.Wrap };
             _relabel.Add(ShowVolumeNote);
             page.Children.Add(Row(Text("VolumeExact"), _volSlider, _volNumber));
             page.Children.Add(_volNote);
 
             // --- Every key the TV publishes ---
-            _allKeysBox = new ComboBox { Width = 170 };
+            // 150 px: the Portuguese label is wider in Roboto, and the row must stay within 382 px.
+            _allKeysBox = new ComboBox { Width = 150 };
             _allKeysBox.ItemsSource = AllKeys.Build(null);
             _relabel.Add(() => _allKeysBox.PlaceholderText = Strings.Get("ChooseKey"));
             page.Children.Add(Row(Text("AllKeysLabel"), _allKeysBox, Btn("SendKey", SendSelectedKey, 70)));
@@ -501,6 +473,13 @@ namespace SonyTvRemote
             var b = new Button { Width = width, HorizontalContentAlignment = HorizontalAlignment.Center };
             Label(b, key);
             b.Click += async (s, e) => await Click(action);
+            return b;
+        }
+
+        // The one main button of the window: orange (see Theme).
+        private static Button MainBtn(Button b)
+        {
+            b.Classes.Add("primary");
             return b;
         }
 
@@ -573,8 +552,8 @@ namespace SonyTvRemote
 
         private void RenderStatus()
         {
-            _status.Foreground = _statusKey == "Ready" ? Brushes.Gray
-                : _statusError ? Brushes.Firebrick : Brushes.ForestGreen;
+            _status.Foreground = _statusKey == "Ready" ? AppTheme.MutedBrush
+                : _statusError ? AppTheme.ErrorBrush : AppTheme.SuccessBrush;
             _status.Text = Strings.Get(_statusKey, _statusArgs);
         }
 

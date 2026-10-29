@@ -243,7 +243,7 @@ namespace SonyTvRemote.Tests
         }
 
         [Fact]
-        public void Version_is_1_4_0()
-            => Assert.Equal("1.4.0", AppInfo.Version);
+        public void Version_is_1_5_0()
+            => Assert.Equal("1.5.0", AppInfo.Version);
     }
 }

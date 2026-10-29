@@ -29,14 +29,16 @@ namespace SonyTvRemote
             {
                 Text = Strings.Get("TitleWithVersion", Strings.Get("AppTitle"), AppInfo.Version),
                 FontSize = 18,
-                FontWeight = FontWeight.SemiBold
+                FontFamily = AppTheme.Poppins,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = AppTheme.NavyBrush
             });
             header.Children.Add(new TextBlock { Text = Strings.Get("Version", AppInfo.Version) });
 
             var link = new TextBlock
             {
                 Text = AppInfo.RepoUrl,
-                Foreground = Brushes.RoyalBlue,
+                Foreground = AppTheme.OrangeTextBrush,
                 TextDecorations = TextDecorations.Underline,
                 Cursor = new Cursor(StandardCursorType.Hand)
             };
@@ -49,6 +51,7 @@ namespace SonyTvRemote
             header.Children.Add(new TextBlock
             {
                 Text = Strings.Get("History"),
+                FontFamily = AppTheme.Poppins,
                 FontWeight = FontWeight.SemiBold,
                 Margin = new Thickness(0, 10, 0, 0)
             });
@@ -169,7 +172,7 @@ namespace SonyTvRemote
                 var label = new StackPanel();
                 label.Children.Add(new TextBlock { Text = first, TextWrapping = TextWrapping.Wrap });
                 if (!string.IsNullOrEmpty(chosen.Model))
-                    label.Children.Add(new TextBlock { Text = chosen.Model, Foreground = Brushes.Gray });
+                    label.Children.Add(new TextBlock { Text = chosen.Model, Foreground = AppTheme.MutedBrush });
                 var b = new Button
                 {
                     Content = label,

@@ -563,7 +563,7 @@ namespace SonyTvRemote.Tests
             foreach (var lang in new[] { Lang.EnUs, Lang.PtBr })
             {
                 var text = Strings.Get(lang, "ChangelogText");
-                Assert.StartsWith("1.4.0 ", text);
+                Assert.StartsWith("1.5.0 ", text);
                 Assert.Contains("1.3.0", text);
             }
         }

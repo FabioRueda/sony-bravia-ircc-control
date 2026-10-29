@@ -269,6 +269,48 @@ window read it from the assembly.
 - Use the search only on networks you administer or where you have permission
   to scan.
 
+### Look (1.5.0)
+
+The app uses a navy and orange theme, always in its light version (also when
+Windows is in dark mode). All colors, fonts and corner radii live in
+`app/Theme.cs`.
+
+| Color | Hex | Use |
+|---|---|---|
+| Navy | `#131B59` | button and tab text, button border, selected tab, Fluent accent, keyboard focus |
+| Navy dark | `#0B1140` | hover of the selected tab |
+| Navy light | `#E7E9F3` | pressed button, selected list item |
+| Orange | `#FF9B00` | only the main button (Power on), with navy text |
+| Orange hover | `#E68A00` | hover of the main button |
+| Orange text | `#A84E00` | the repository link in the About window |
+| Ink | `#1E2235` | normal text |
+| Muted | `#565D73` | secondary text, field and tab borders |
+| Line | `#D9DCE5` | dividers and the border of a disabled button |
+| Mist | `#F3F4F8` | unselected tab, button hover |
+| Success | `#1E7A46` | success messages, "connected" input |
+| Error | `#B42318` | error messages, volume warning |
+
+Fonts: **Poppins** SemiBold for titles, buttons and tabs (Bold for the selected
+tab) and **Roboto** Regular for everything else; Arial if a font cannot load.
+Corners: fields and drop-downs 6 px, buttons 10 px, tabs 6 px. The four colored
+remote-control keys keep the colors of a real remote (red, green, yellow, blue);
+the green is darker so its white label is readable. The unit tests check the
+WCAG 2.x contrast of every text and border color pair (4.5:1 for text, 3:1 for
+control borders).
+
+### Third-party fonts
+
+The `.exe` embeds these fonts from [google/fonts](https://github.com/google/fonts),
+under the SIL Open Font License 1.1. The license texts are in `app/Assets/Fonts/`
+(`Poppins-OFL.txt`, `Roboto-OFL.txt`).
+
+- Poppins SemiBold and Poppins Bold (`Poppins-SemiBold.ttf`, `Poppins-Bold.ttf`).
+- Roboto Regular. `Roboto-Variable.ttf` is the upstream variable file (kept in the
+  repository, not embedded). `Roboto-Regular.ttf` is its weight 400, width 100
+  instance, made with fontTools `varLib.instancer`; it is the file embedded in
+  the `.exe`, because Skia on Windows loads the variable file as its Thin (100)
+  instance.
+
 ### Download or build
 
 Published builds of `SonyTvRemote.exe` go on the

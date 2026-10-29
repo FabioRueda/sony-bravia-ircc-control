@@ -7,7 +7,7 @@
     <AssemblyName>SonyTvRemote</AssemblyName>
     <Product>Sony TV Remote</Product>
     <!-- The only place the version number lives; the app reads it from the assembly. -->
-    <Version>1.4.0</Version>
+    <Version>1.5.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
@@ -16,5 +16,15 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.0.10" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.10" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Poppins and Roboto, embedded so the single .exe does not depend on installed fonts.
+         Roboto-Variable.ttf is the upstream file; Roboto-Regular.ttf is its wght=400, wdth=100 instance,
+         because Skia on Windows registers the variable file as its Thin instance (weight 100). Only the
+         instance is embedded. -->
+    <AvaloniaResource Include="Assets\Fonts\Poppins-SemiBold.ttf" />
+    <AvaloniaResource Include="Assets\Fonts\Poppins-Bold.ttf" />
+    <AvaloniaResource Include="Assets\Fonts\Roboto-Regular.ttf" />
+    <AvaloniaResource Include="Assets\Fonts\*.txt" />
   </ItemGroup>
 </Project>

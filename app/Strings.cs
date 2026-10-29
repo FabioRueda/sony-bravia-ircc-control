@@ -136,7 +136,14 @@ namespace SonyTvRemote
             ["History"] = "Version history",
             ["Close"] = "Close",
             ["ChangelogText"] =
-@"1.4.0 — 2026-10-28
+@"1.5.0 — 2026-10-28
+
+Changed
+• New navy and orange theme: navy buttons and tabs (the selected tab is solid navy), an orange Power on button, and a darker green color key so its label is easy to read.
+• Poppins and Roboto fonts, embedded in the app.
+• Light theme only, even when Windows uses dark mode.
+
+1.4.0 — 2026-10-28
 
 Added
 • Find TV button next to the TV IP: searches the network (SSDP, then a scan of your private /24 on port 52323) and lists the Sony TVs it finds. Click yours to use it.
@@ -348,7 +355,14 @@ Added
             ["History"] = "Histórico de versões",
             ["Close"] = "Fechar",
             ["ChangelogText"] =
-@"1.4.0 — 28/10/2026
+@"1.5.0 — 28/10/2026
+
+Mudou
+• Tema novo em azul-marinho e laranja: botões e abas em azul-marinho (a aba selecionada fica toda em azul-marinho), botão Ligar em laranja e a tecla verde mais escura, para o nome dela ficar fácil de ler.
+• Fontes Poppins e Roboto, embutidas no app.
+• Só tema claro, mesmo com o Windows em modo escuro.
+
+1.4.0 — 28/10/2026
 
 Novo
 • Botão Procurar ao lado do IP da TV: procura na rede (SSDP e, se for preciso, uma varredura da sua /24 privada na porta 52323) e lista as TVs Sony que achar. Clique na sua para usá-la.
