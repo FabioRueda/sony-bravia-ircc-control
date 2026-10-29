@@ -35,10 +35,27 @@ What was tested on the KDL-42W805A (2026-10-28):
 | Set an exact volume (`setAudioVolume`) | ⚠️ Pairing required | Unpaired: HTTP 403 with `auth_url`. Paired: worked (set +1, read back, restored) |
 | Switch input (`setPlayContent`) | ⚠️ Pairing required | Paired: HDMI 1 and back worked. Unpaired: only the IRCC HDMI1–4 codes |
 | Set the TV clock (`setCurrentTime`) | ⚠️ Pairing required | `dateTime` must be UTC with a `Z` suffix; see [Windows app](#windows-app-sonytvremote) |
-| Type text (`setTextForm`) | ⚠️ Pairing required | Only with a text field open on the TV (`textInput` is `on`). The success path was not tested without someone at the TV |
+| Type text (`setTextForm`) | ⚠️ Pairing required | Only with a text field open on the TV (`textInput` is `on`). Checked in front of the TV: the text appeared in the field |
 | Open a URL on the TV's browser | ⚠️ Pairing required | Works from the app after pairing (`https://example.com` opened). The script cannot pair |
 | Install a new app (APK/sideload) | ❌ | Not Android TV |
 | ADB over network | ❌ | Port 5555 closed |
+
+### Hands-on findings (Brazilian KDL-42W805A, 2026-10-28)
+
+Checked by someone in front of the TV, with the keys sent over the network:
+
+| Key or behavior | Result |
+|---|---|
+| `Enter` (`AAAAAQAAAAEAAAALAw==`, the same code as `Num12`) | Does not confirm a typed channel number; the TV tunes only after its own timeout |
+| `Confirm` (OK) | Confirms a typed channel number at once |
+| `Analog` (`AAAAAgAAAHcAAAANAw==`) | The **ANT** key of the Brazilian remote: switches the tuner between Antenna (digital) and Cable (analog), both ways |
+| `Analog2`, `Analog?`, `Digital` | No visible effect |
+| `Jump` | Goes back to the previous channel or input |
+| `Display` | Shows the information banner. With no picture nothing shows; on the Screen mirroring page it opens that page's help |
+| `Red`, `Green`, `Yellow`, `Blue` | Not verified: no screen with color-key hints was found |
+| Key list | `system/getRemoteControllerInfo` lists 95 keys |
+| Long standby | After a while in standby the TV leaves the network (ports 80 and 52323 stop answering), but Wake-on-LAN still turns it on |
+| Change notifications | None on this 2013 API: the app polls the inputs (every 3 s) and the volume (every 2 s) only while those tabs are open |
 
 ## ⚠️ Security warning
 
@@ -286,16 +303,19 @@ HTTP 200 with a new cookie. The app does this automatically when less than
 
 ## Power on with Wake-on-LAN
 
-In standby the KDL-42W805A still answers on port 80 (`getPowerStatus` returns
-`"standby"`), but IRCC Power ON returns HTTP 200 and the TV stays off, and
+Shortly after going to standby the KDL-42W805A still answers on port 80
+(`getPowerStatus` returns `"standby"`). After a longer standby it leaves the
+network: ports 80 and 52323 stop answering and only the magic packet reaches
+it. Either way, IRCC Power ON returns HTTP 200 and the TV stays off, and
 `system/setPowerStatus {"status":true}` (paired) answers
 `{"error":[15,"power on not supported"]}`. **Only Wake-on-LAN turns it on.**
 
 The TV reports its MAC without pairing in `system/getSystemSupportedFunction`
 (item with `"option":"WOL"`). The app saves it for that TV's IP the first time
 it talks to the TV, so it is available when the TV is in standby. If no MAC is
-saved for the current IP, Power On asks the TV for it first (the KDL-42W805A
-still answers on port 80 in standby).
+saved for the current IP, Power On asks the TV for it first. That works only
+while the TV still answers on port 80; after a long standby it does not, so the
+MAC has to be saved on an earlier contact.
 
 The app's **Power On**:
 
@@ -307,7 +327,7 @@ The app's **Power On**:
 4. Keeps checking until 20 s in total and shows "On" or "Still in standby".
    It stops as soon as the TV reports `"active"`.
 
-On the test TV it reported `"active"` about 2 s after the magic packet.
+On the test TV it reported `"active"` 1–2 s after the magic packet from a recent standby. It also woke from a long standby, when it no longer answered on the network.
 
 ## Controlling from any language
 
