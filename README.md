@@ -40,9 +40,9 @@ What was tested on the KDL-42W805A (2026-10-28):
 | Install a new app (APK/sideload) | ❌ | Not Android TV |
 | ADB over network | ❌ | Port 5555 closed |
 
-### Hands-on findings (Brazilian KDL-42W805A, 2026-10-28)
+### Hands-on findings (Brazilian KDL-42W805A, 2026-10-28 and 2026-10-29)
 
-Checked by someone in front of the TV, with the keys sent over the network:
+Checked by someone in front of the TV (keys sent over the network) and on the real network (discovery):
 
 | Key or behavior | Result |
 |---|---|
@@ -56,6 +56,10 @@ Checked by someone in front of the TV, with the keys sent over the network:
 | Key list | `system/getRemoteControllerInfo` lists 95 keys |
 | Long standby | After a while in standby the TV leaves the network (ports 80 and 52323 stop answering), but Wake-on-LAN still turns it on |
 | Change notifications | None on this 2013 API: the app polls the inputs (every 3 s) and the volume (every 2 s) only while those tabs are open |
+| SSDP discovery (2026-10-29) | The TV answers `M-SEARCH` for both `urn:schemas-sony-com:service:ScalarWebAPI:1` and `urn:schemas-sony-com:service:IRCC:1`; the first answer comes in about 0.5 s; `LOCATION` is `http://<TV IP>:52323/dmr.xml` |
+| Port 52323 scan (2026-10-29) | Scanning a /24 (500 ms timeout, 64 connections at a time) takes about 2.2 s |
+| IP change (2026-10-29) | The pairing cookie keeps working at the new IP: it depends on the TV and the client id, not on the IP (checked with `system/getSystemInformation` after a simulated IP change) |
+| Windows Firewall (2026-10-29) | No prompt on the app's first search |
 
 ## ⚠️ Security warning
 
